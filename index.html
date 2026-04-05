@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Monitor Sísmico - Navidad</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+:root {
+  --bg: #020617;
+  --panel: #081225;
+  --panel-2: #0b1730;
+  --border: #1e3358;
+  --border-soft: #28406c;
+  --text: #eef4ff;
+  --muted: #96a7c7;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #e11d48;
+  --blue1: #60a5fa;
+  --blue2: #38bdf8;
+  --blue3: #22d3ee;
+  --blue4: #67e8f9;
+  --amber: #fbbf24;
+  --shadow: 0 10px 28px rgba(0,0,0,0.35);
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(56,189,248,0.10), transparent 22%),
+    radial-gradient(circle at top right, rgba(225,29,72,0.08), transparent 20%),
+    linear-gradient(180deg, #020617 0%, #07111f 100%);
+  color: var(--text);
+}
+
+#container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1.3fr 0.7fr;
+  gap: 10px;
+  height: 100%;
+  padding: 10px;
+}
+
+.box {
+  background: linear-gradient(180deg, rgba(7,17,31,0.98), rgba(5,12,24,0.98));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#resumen-box {
+  overflow-y: auto;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  z-index: 9999;
+}
+
+.section-title {
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #ffffff;
+}
+
+.subsection-title {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.panel-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+#ultimo-card {
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, rgba(10,25,53,0.95), rgba(7,17,35,0.95));
+  border-radius: 16px;
+  padding: 12px;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+#ultimo-card:hover {
+  transform: translateY(-1px);
+  border-color: #5b84d6;
+}
+
+.ultimo-label {
+  text-align: center;
+  font-size: 11px;
+  color: #d8e4ff;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#ultimo-mag {
+  text-align: center;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+#ultimo-info {
+  text-align: center;
+  font-size: 12px;
+  color: #dbeafe;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(8,18,37,0.95), rgba(6,14,28,0.95));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.card-label {
+  font-size: 10px;
+  color: #a8bbda;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+.card b {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.filtros-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(4,10,20,0.45);
+}
+
+.filtros-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btnFiltro {
+  border: none;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: 0.16s ease;
+  box-shadow: 0 5px 14px rgba(0,0,0,0.22);
+}
+
+.btnFiltro:hover {
+  transform: translateY(-1px);
+}
+
+.btnFiltro.active {
+  outline: 2px solid rgba(255,255,255,0.95);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08), 0 8px 18px rgba(0,0,0,0.28);
+}
+
+.btnBase {
+  background: #3a4a66;
+  color: white;
+}
+
+.btnTiempo24 { background: var(--blue1); color: #04111d; }
+.btnTiempo60 { background: var(--blue2); color: #04111d; }
+.btnTiempo30 { background: var(--blue3); color: #04111d; }
+.btnTiempo15 { background: var(--blue4); color: #04111d; }
+
+.btnMag1 { background: var(--green); color: #07110c; }
+.btnMag2 { background: var(--yellow); color: #111827; }
+.btnMag3 { background: var(--red); color: white; }
+
+.btnPercibidos {
+  width: 100%;
+  border: 1px solid rgba(251,191,36,0.22);
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  background: linear-gradient(180deg, #26354d, #182437);
+  color: white;
+  transition: 0.16s ease;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.24);
+}
+
+.btnPercibidos:hover {
+  transform: translateY(-1px);
+}
+
+.btnPercibidos.active {
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
+  color: #111827;
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.18), 0 8px 18px rgba(0,0,0,0.28);
+}
+
+.capa-box {
+  display: flex;
+  justify-content: center;
+}
+
+.toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #22314c, #162133);
+  border: 1px solid var(--border-soft);
+  color: #f3f7ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: 0.16s ease;
+  user-select: none;
+}
+
+.toggle-chip:hover {
+  transform: translateY(-1px);
+  border-color: #ef4444;
+}
+
+.toggle-chip input {
+  accent-color: #ef4444;
+  width: 15px;
+  height: 15px;
+}
+
+#tabla-container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabla-scroll {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(2,6,23,0.30);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: #142340;
+  color: #ffffff;
+  z-index: 2;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+th, td {
+  padding: 9px 8px;
+  border-bottom: 1px solid rgba(41,61,96,0.7);
+  text-align: center;
+}
+
+tbody tr:hover {
+  background: rgba(20,35,64,0.75);
+  cursor: pointer;
+}
+
+.simbologia {
+  margin-top: 0;
+  max-height: 100%;
+}
+
+.simbologia .section-title {
+  padding: 10px 12px 0;
+}
+
+.simbologia-body {
+  padding: 8px 10px 10px;
+  margin-top: 0;
+}
+
+.simbologia-box {
+  background: rgba(2,6,23,0.34);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.linea-falla {
+  width: 22px;
+  height: 0;
+  border-top: 3px dashed #ef4444;
+  margin-right: 8px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid rgba(51,65,85,0.8);
+  margin: 10px 0;
+}
+
+.warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--amber);
+}
+
+.label {
+  transform: translate(-50%, -140%);
+}
+
+.bounce-label {
+  display: inline-block;
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%   { transform: scale(1); opacity: 1; }
+  50%  { transform: scale(1.08); opacity: 0.72; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.blink {
+  animation: blinkAnim 1s infinite;
+}
+
+@keyframes blinkAnim {
+  0% { opacity: 1; }
+  50% { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+
+.falla-line {
+  filter: drop-shadow(0 0 4px rgba(239,68,68,0.55));
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #0f172a;
+  color: white;
+  border: 1px solid #334155;
+}
+
+@media (max-width: 1200px) {
+  #container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 42vh auto auto auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  html, body {
+    overflow: auto;
+  }
+
+  #resumen-box {
+    overflow: visible;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">⏳ Obteniendo datos...</div>
+
+<div id="container">
+
+  <div class="box">
+    <div id="map"></div>
+  </div>
+
+  <div class="box" id="resumen-box">
+    <div class="panel-body">
+
+      <h3 class="section-title">RESUMEN GENERAL</h3>
+
+      <div id="ultimo-card">
+        <div class="ultimo-label">Último sismo</div>
+        <div id="ultimo-mag" class="blink">--</div>
+        <div id="ultimo-info">--</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card">
+          <div class="card-label">Total</div>
+          <b id="total">0</b>
+        </div>
+        <div class="card">
+          <div class="card-label">Máx</div>
+          <b id="max">0</b>
+        </div>
+        <div class="card">
+          <div class="card-label">Prom</div>
+          <b id="prom">0</b>
+        </div>
+        <div class="card">
+          <div class="card-label">Percibidos</div>
+          <b id="perc">0</b>
+        </div>
+      </div>
+
+      <div class="filtros-wrap">
+
+        <div>
+          <div class="subsection-title">Filtro de tiempo</div>
+          <div id="filtroTiempo" class="filtros-row">
+            <button class="btnFiltro btnBase active" data-time="0">Todas</button>
+            <button class="btnFiltro btnTiempo24" data-time="1440">24 horas</button>
+            <button class="btnFiltro btnTiempo60" data-time="60">1 hora</button>
+            <button class="btnFiltro btnTiempo30" data-time="30">30 min</button>
+            <button class="btnFiltro btnTiempo15" data-time="15">15 min</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="subsection-title">Filtro de magnitud</div>
+          <div id="filtroMagnitud" class="filtros-row">
+            <button class="btnFiltro btnBase active" data-mag="0">Todas</button>
+            <button class="btnFiltro btnMag1" data-mag="1">&lt; 3.5</button>
+            <button class="btnFiltro btnMag2" data-mag="2">3.5 – 3.9</button>
+            <button class="btnFiltro btnMag3" data-mag="3">≥ 4.0</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="subsection-title">Percibidos</div>
+          <button id="btnPercibidos" class="btnPercibidos">VER PERCIBIDOS</button>
+        </div>
+
+        <div>
+          <div class="subsection-title">Capas</div>
+          <div class="capa-box">
+            <label class="toggle-chip">
+              <input type="checkbox" id="toggleFallas">
+              VER FALLAS GEOLÓGICAS
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div class="box" id="tabla-container">
+    <h3 class="section-title" style="margin-bottom:12px;">SISMOS</h3>
+    <div class="tabla-scroll">
+      <table id="tabla">
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>Fecha/Hora</th>
+            <th>Referencia</th>
+            <th>Prof</th>
+            <th>Mag</th>
+            <th>Percibido</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="box simbologia">
+    <h3 class="section-title">SIMBOLOGÍA</h3>
+    <div class="simbologia-body">
+      <div class="simbologia-box">
+        <div><b>Magnitud</b></div>
+
+        <div class="item-row">
+          <div class="dot" style="background:#22c55e;"></div>
+          Menor a 3.5
+        </div>
+
+        <div class="item-row">
+          <div class="dot" style="background:#eab308;"></div>
+          3.5 - 3.9
+        </div>
+
+        <div class="item-row">
+          <div class="dot" style="background:#e11d48;"></div>
+          4.0 o mayor
+        </div>
+
+        <hr class="divider">
+
+        <div><b>Fallas geológicas</b></div>
+
+        <div class="item-row">
+          <div class="linea-falla"></div>
+          Falla geológica
+        </div>
+
+        <div class="warning">
+          ⚠ Se recomienda activar esta capa solo cuando sea necesario.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRstFFXznf91Eq1IOE0ppef67fPl7lPLOU0j0lmopN6WNv0mZqjrfYFuV-NB-0QWJzc5QsEFWoiPK8y/pub?gid=682229452&single=true&output=csv";
+
+const FALLAS = [
+  [[-33.20, -71.95], [-33.00, -71.60], [-32.80, -71.20]],
+  [[-34.10, -72.20], [-33.70, -71.85], [-33.30, -71.40]],
+  [[-35.10, -72.80], [-34.70, -72.30], [-34.20, -71.90]]
+];
+
+const map = L.map("map");
+
+const chileBounds = [
+  [-56, -76],
+  [-17, -66]
+];
+
+map.fitBounds(chileBounds);
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  attribution: "&copy; OpenStreetMap & CARTO"
+}).addTo(map);
+
+let layer = L.layerGroup().addTo(map);
+let fallasLayer = L.layerGroup();
+
+let ultimoSismoGlobal = null;
+let ultimoCircleGlobal = null;
+
+let filtroMagnitud = 0;
+let filtroTiempoMin = 0;
+let filtroPercibidos = false;
+
+const tabla = document.querySelector("#tabla tbody");
+const btnPercibidos = document.getElementById("btnPercibidos");
+const toggleFallas = document.getElementById("toggleFallas");
+
+function dibujarFallas() {
+  fallasLayer.clearLayers();
+
+  FALLAS.forEach(coords => {
+    L.polyline(coords, {
+      color: "#ef4444",
+      weight: 3,
+      dashArray: "8, 8",
+      opacity: 0.95,
+      className: "falla-line"
+    }).addTo(fallasLayer);
+  });
+}
+
+dibujarFallas();
+
+toggleFallas.addEventListener("change", () => {
+  if (toggleFallas.checked) {
+    map.addLayer(fallasLayer);
+  } else {
+    map.removeLayer(fallasLayer);
+  }
+});
+
+function activarBotonTodas(containerId) {
+  const contenedor = document.getElementById(containerId);
+  contenedor.querySelectorAll(".btnFiltro").forEach(b => b.classList.remove("active"));
+  const btnTodas = contenedor.querySelector('[data-time="0"], [data-mag="0"]');
+  if (btnTodas) btnTodas.classList.add("active");
+}
+
+document.querySelectorAll("#filtroTiempo .btnFiltro").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const valor = Number(btn.dataset.time);
+
+    if (filtroTiempoMin === valor) {
+      filtroTiempoMin = 0;
+      activarBotonTodas("filtroTiempo");
+      loadData();
+      return;
+    }
+
+    document.querySelectorAll("#filtroTiempo .btnFiltro").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    filtroTiempoMin = valor;
+    loadData();
+  });
+});
+
+document.querySelectorAll("#filtroMagnitud .btnFiltro").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const valor = Number(btn.dataset.mag);
+
+    if (filtroMagnitud === valor) {
+      filtroMagnitud = 0;
+      activarBotonTodas("filtroMagnitud");
+      loadData();
+      return;
+    }
+
+    document.querySelectorAll("#filtroMagnitud .btnFiltro").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    filtroMagnitud = valor;
+    loadData();
+  });
+});
+
+btnPercibidos.addEventListener("click", () => {
+  filtroPercibidos = !filtroPercibidos;
+  btnPercibidos.classList.toggle("active", filtroPercibidos);
+  loadData();
+});
+
+function parseFechaHora(fecha, hora) {
+  if (!fecha) return null;
+
+  const fechaLimpia = fecha.replace(/\//g, "-");
+  const partesFecha = fechaLimpia.split("-");
+  const partesHora = (hora || "00:00:00").split(":");
+
+  let year, month, day;
+
+  if (partesFecha[0] && partesFecha[0].length === 4) {
+    year = Number(partesFecha[0]);
+    month = Number(partesFecha[1]) - 1;
+    day = Number(partesFecha[2]);
+  } else {
+    day = Number(partesFecha[0]);
+    month = Number(partesFecha[1]) - 1;
+    year = Number(partesFecha[2]);
+  }
+
+  const hh = Number(partesHora[0] || 0);
+  const mm = Number(partesHora[1] || 0);
+  const ss = Number(partesHora[2] || 0);
+
+  return new Date(year, month, day, hh, mm, ss);
+}
+
+function parseCSV(text) {
+  return text.trim().split("\n").slice(1).map(r => {
+    const c = r.split(",").map(x => x.trim());
+    const fechaHora = (c[1] || "").trim();
+    const partes = fechaHora.split(" ");
+    const fecha = partes[0] || "";
+    const hora = partes[1] || "00:00:00";
+
+    return {
+      n: Number(c[0]),
+      fecha,
+      hora,
+      lugar: c[2],
+      lat: parseFloat(c[4]),
+      lon: parseFloat(c[5]),
+      prof: parseFloat(c[6]),
+      mag: parseFloat(c[7]),
+      percibido: c[8],
+      timestamp: parseFechaHora(fecha, hora)
+    };
+  });
+}
+
+function getColor(mag) {
+  if (mag >= 4) return "#e11d48";
+  if (mag >= 3.5) return "#eab308";
+  return "#22c55e";
+}
+
+function createLabel(s) {
+  const color = getColor(s.mag);
+  const bounceClass = s.percibido === "SI" ? "bounce-label" : "";
+
+  return L.divIcon({
+    className: "label",
+    html: `
+      <div class="${bounceClass}" style="
+        background: white;
+        border-radius: 12px;
+        border: 2px solid ${color};
+        padding: 4px 8px;
+        text-align: center;
+        font-weight: bold;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.22);
+      ">
+        <div style="color:${color}; font-size:14px;">M${s.mag}</div>
+        <div style="font-size:11px; color:black;">${s.prof} km</div>
+      </div>
+    `,
+    iconSize: [62, 42]
+  });
+}
+
+function createBounceIcon(color) {
+  return L.divIcon({
+    html: `
+      <div style="
+        width:16px;
+        height:16px;
+        border-radius:50%;
+        background:${color};
+        box-shadow:0 0 0 5px rgba(255,255,255,0.22);
+      "></div>
+    `,
+    iconSize: [16,16]
+  });
+}
+
+function separatePoints(data) {
+  const groups = {};
+
+  data.forEach(s => {
+    const key = `${s.lat},${s.lon}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+
+  Object.values(groups).forEach(group => {
+    if (group.length > 1) {
+      const step = (2 * Math.PI) / group.length;
+      group.forEach((s, i) => {
+        s.lat += Math.cos(i * step) * 0.01;
+        s.lon += Math.sin(i * step) * 0.01;
+      });
+    }
+  });
+
+  return data;
+}
+
+function actualizarUltimoSismo(dataCompleta) {
+  if (!dataCompleta.length) return;
+
+  const ordenados = [...dataCompleta].sort((a, b) => b.n - a.n);
+  const u = ordenados[0];
+  ultimoSismoGlobal = u;
+
+  const color = getColor(u.mag);
+
+  document.getElementById("ultimo-mag").innerHTML = `<span style="color:${color}">M${u.mag}</span>`;
+  document.getElementById("ultimo-info").innerText = `${u.lugar} | ${u.fecha} ${u.hora}`;
+}
+
+function filtrarPorTiempo(data) {
+  if (filtroTiempoMin === 0) return data;
+
+  const ahora = new Date();
+  const limite = new Date(ahora.getTime() - (filtroTiempoMin * 60 * 1000));
+
+  return data.filter(s => s.timestamp && s.timestamp >= limite);
+}
+
+function loadData() {
+  fetch(CSV_URL)
+    .then(r => r.text())
+    .then(txt => {
+      let dataCompleta = parseCSV(txt);
+
+      dataCompleta = dataCompleta.sort((a, b) => b.n - a.n);
+
+      actualizarUltimoSismo(dataCompleta);
+
+      let data = dataCompleta.map(s => ({ ...s }));
+      data = separatePoints(data);
+
+      data = filtrarPorTiempo(data);
+
+      if (filtroPercibidos) {
+        data = data.filter(s => s.percibido === "SI");
+      }
+
+      data = data.filter(s => {
+        let cumpleMag = true;
+
+        if (filtroMagnitud === 1) cumpleMag = s.mag < 3.5;
+        if (filtroMagnitud === 2) cumpleMag = s.mag >= 3.5 && s.mag < 4;
+        if (filtroMagnitud === 3) cumpleMag = s.mag >= 4;
+
+        return cumpleMag;
+      });
+
+      data.sort((a, b) => b.n - a.n);
+
+      layer.clearLayers();
+      tabla.innerHTML = "";
+      ultimoCircleGlobal = null;
+
+      document.getElementById("total").innerText = data.length;
+
+      if (data.length > 0) {
+        const mags = data.map(s => s.mag);
+        document.getElementById("max").innerText = Math.max(...mags).toFixed(1);
+        document.getElementById("prom").innerText = (mags.reduce((a,b) => a+b,0) / mags.length).toFixed(2);
+        document.getElementById("perc").innerText = data.filter(s => s.percibido === "SI").length;
+      } else {
+        document.getElementById("max").innerText = "0";
+        document.getElementById("prom").innerText = "0";
+        document.getElementById("perc").innerText = "0";
+      }
+
+      data.forEach((s) => {
+        const color = getColor(s.mag);
+
+        const circle = L.circleMarker([s.lat, s.lon], {
+          radius: 6,
+          color: "#020617",
+          weight: 1.5,
+          fillColor: color,
+          fillOpacity: 0.95
+        }).addTo(layer);
+
+        if (ultimoSismoGlobal && s.n === ultimoSismoGlobal.n && !ultimoCircleGlobal) {
+          ultimoCircleGlobal = circle;
+        }
+
+        if (s.percibido === "SI") {
+          L.marker([s.lat, s.lon], { icon: createBounceIcon(color) }).addTo(layer);
+        }
+
+        const label = L.marker([s.lat, s.lon], { icon: createLabel(s) }).addTo(layer);
+
+        const popupContent = `
+          <div style="min-width:180px; line-height:1.5;">
+            <b>${s.lugar}</b><br>
+            Fecha: ${s.fecha} ${s.hora}<br>
+            Magnitud: ${s.mag}<br>
+            Profundidad: ${s.prof} km<br>
+            Percibido: ${s.percibido}
+          </div>
+        `;
+
+        circle.bindPopup(popupContent);
+        label.bindPopup(popupContent);
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${s.n}</td>
+          <td>${s.fecha} ${s.hora}</td>
+          <td>${s.lugar}</td>
+          <td>${s.prof} km</td>
+          <td>${s.mag}</td>
+          <td>${s.percibido}</td>
+        `;
+
+        row.onclick = () => {
+          map.flyTo([s.lat, s.lon], 11, { duration: 0.8 });
+          setTimeout(() => circle.openPopup(), 800);
+        };
+
+        tabla.appendChild(row);
+      });
+
+      document.getElementById("loading").style.display = "none";
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("loading").innerText = "Error cargando datos";
+    });
+}
+
+loadData();
+setInterval(loadData, 60000);
+
+document.getElementById("ultimo-card").onclick = () => {
+  if (ultimoSismoGlobal && ultimoCircleGlobal) {
+    map.flyTo([ultimoSismoGlobal.lat, ultimoSismoGlobal.lon], 11, { duration: 0.8 });
+    setTimeout(() => ultimoCircleGlobal.openPopup(), 800);
+    return;
+  }
+
+  if (ultimoSismoGlobal) {
+    map.flyTo([ultimoSismoGlobal.lat, ultimoSismoGlobal.lon], 11, { duration: 0.8 });
+  }
+};
+</script>
+
+</body>
+</html>
