@@ -15,12 +15,15 @@
     h1{margin:0 0 10px;font-size:24px}
     p{color:var(--muted);line-height:1.5}
     label{display:flex;flex-direction:column;gap:6px;margin:12px 0}
-    input{width:100%;min-height:42px;border:1px solid #31486d;border-radius:12px;background:#0a162a;color:#fff;padding:10px 12px;font-size:14px;font-weight:700}
-    button{width:100%;min-height:44px;margin-top:10px;border:none;border-radius:12px;background:linear-gradient(180deg,#0ea5e9,#1d4ed8);color:#fff;font-weight:800;cursor:pointer}
+    input{width:100%;min-height:46px;border:1px solid #31486d;border-radius:12px;background:#0a162a;color:#fff;padding:10px 12px;font-size:16px;font-weight:700}
+    button{width:100%;min-height:46px;margin-top:10px;border:none;border-radius:12px;background:linear-gradient(180deg,#0ea5e9,#1d4ed8);color:#fff;font-weight:800;cursor:pointer}
+    .sign-row{display:grid;grid-template-columns:1fr 48px;gap:8px;align-items:center}
+    .sign-row button{margin-top:0;font-size:20px;background:linear-gradient(180deg,#1e3a5f,#0f1f3a);border:1px solid #315887}
     .status{margin-top:12px;font-size:13px;color:#cfe0ff;min-height:22px}
     .preview{padding:12px;min-height:760px}
     iframe{width:100%;height:730px;border:none;border-radius:14px;background:#07111f}
-    @media (max-width: 920px){.layout{grid-template-columns:1fr}.preview{min-height:520px}iframe{height:480px}}
+    @media (max-width: 920px){body{padding:0}.layout{grid-template-columns:1fr;gap:0}.card{border-radius:0;border-left:0;border-right:0}.preview{min-height:520px}iframe{height:480px}}
+    @media (max-width: 520px){.left{padding:14px}iframe{height:360px}.preview{padding:10px;min-height:400px}}
   </style>
 </head>
 <body>
@@ -29,13 +32,19 @@
       <h1>Generar mapa</h1>
       <p>Prueba rápida del Web App de Google Apps Script. Edita la constante <b>MAPA_PREVIEW_WEBAPP_URL</b> en este archivo antes de usarlo.</p>
       <label>Latitud
-        <input id="latitud" type="number" step="any" min="-90" max="90" placeholder="Ej: -19.101">
+        <div class="sign-row">
+          <input id="latitud" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: -19.101">
+          <button id="signoLat" type="button" title="Cambiar signo">±</button>
+        </div>
       </label>
       <label>Longitud
-        <input id="longitud" type="number" step="any" min="-180" max="180" placeholder="Ej: -69.372">
+        <div class="sign-row">
+          <input id="longitud" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: -69.372">
+          <button id="signoLon" type="button" title="Cambiar signo">±</button>
+        </div>
       </label>
       <label>Magnitud
-        <input id="magnitud" type="number" step="0.1" min="0" max="10" placeholder="Ej: 4.2">
+        <input id="magnitud" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 4.2">
       </label>
       <button id="btnGenerar">Generar</button>
       <div id="estado" class="status">Completa los tres campos.</div>
@@ -50,9 +59,26 @@
     const latitud = document.getElementById('latitud');
     const longitud = document.getElementById('longitud');
     const magnitud = document.getElementById('magnitud');
+    const signoLat = document.getElementById('signoLat');
+    const signoLon = document.getElementById('signoLon');
     const btnGenerar = document.getElementById('btnGenerar');
     const estado = document.getElementById('estado');
     const framePreview = document.getElementById('framePreview');
+
+    function normalizar(valor) {
+      return String(valor || '').trim().replace(',', '.');
+    }
+
+    function cambiarSigno(input) {
+      let valor = normalizar(input.value);
+      if (!valor) input.value = '-';
+      else if (valor.startsWith('-')) input.value = valor.substring(1);
+      else input.value = '-' + valor;
+      input.focus();
+    }
+
+    signoLat.addEventListener('click', () => cambiarSigno(latitud));
+    signoLon.addEventListener('click', () => cambiarSigno(longitud));
 
     btnGenerar.addEventListener('click', () => {
       if (!MAPA_PREVIEW_WEBAPP_URL || MAPA_PREVIEW_WEBAPP_URL.includes('PEGA_AQUI')) {
@@ -60,16 +86,20 @@
         return;
       }
 
-      if (!latitud.value || !longitud.value || !magnitud.value) {
-        estado.textContent = 'Debes completar latitud, longitud y magnitud.';
+      const lat = normalizar(latitud.value);
+      const lon = normalizar(longitud.value);
+      const mag = normalizar(magnitud.value);
+
+      if (!lat || !lon || !mag || isNaN(Number(lat)) || isNaN(Number(lon)) || isNaN(Number(mag))) {
+        estado.textContent = 'Debes completar latitud, longitud y magnitud con valores numéricos.';
         return;
       }
 
       const params = new URLSearchParams({
         action: 'previewPage',
-        latitud: latitud.value,
-        longitud: longitud.value,
-        magnitud: magnitud.value,
+        latitud: lat,
+        longitud: lon,
+        magnitud: mag,
         ts: Date.now().toString()
       });
 
