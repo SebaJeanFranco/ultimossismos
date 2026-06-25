@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Monitor Sísmico - RedGeoChile </title>
+<title>Monitor Sísmico - RedGeo Chile</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -669,6 +669,31 @@ html, body {
   box-shadow: 0 0 0 3px rgba(56,189,248,0.16);
 }
 
+
+.input-sign-row {
+  display: grid;
+  grid-template-columns: 1fr 46px;
+  gap: 8px;
+  align-items: center;
+}
+
+.btnSignoCoord {
+  min-height: 42px;
+  border: 1px solid rgba(56,189,248,0.34);
+  border-radius: 12px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #1e3a5f, #0f1f3a);
+  color: #e0f2fe;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.20);
+}
+
+.btnSignoCoord:active {
+  transform: translateY(1px);
+}
+
 .form-help-line {
   font-size: 11px;
   color: #91a6c9;
@@ -995,18 +1020,88 @@ html, body {
 }
 
 @media (max-width: 900px) {
+  .modal-overlay {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+  }
+
   .modal-dialog {
-    width: min(720px, 96vw);
-    max-height: 92vh;
-    overflow-y: auto;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 14px 14px;
+  }
+
+  .modal-header h3 {
+    font-size: 15px;
+  }
+
+  .modal-body {
+    padding: 12px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .generar-form-layout {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .modal-form-card,
+  .modal-preview-card,
+  .modal-sismos-card {
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  .inputMapa {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .btnSignoCoord {
+    min-height: 48px;
+    font-size: 20px;
+  }
+
+  .btnModalPrimary,
+  .btnModalSecondary {
+    min-height: 48px;
+  }
+
+  .modal-form-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 12;
+    padding: 8px 0 0;
+    background: linear-gradient(180deg, rgba(6,16,32,0), #061020 30%);
   }
 
   .preview-map-placeholder {
-    min-height: 320px;
+    min-height: 300px;
+  }
+
+  .preview-star {
+    width: 52px;
+    height: 52px;
+    font-size: 48px;
+  }
+
+  .preview-placeholder-text {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    font-size: 11px;
   }
 
   .modal-sismos-head {
@@ -1016,6 +1111,48 @@ html, body {
 
   .modal-sismos-search {
     width: 100%;
+  }
+
+  .modal-sismos-scroll {
+    max-height: 260px;
+  }
+
+  .modal-sismos-table th,
+  .modal-sismos-table td {
+    padding: 8px 9px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .modal-body {
+    padding: 10px;
+  }
+
+  .modal-help {
+    font-size: 11px;
+  }
+
+  .form-help-line {
+    font-size: 10px;
+  }
+
+  .preview-map-placeholder {
+    min-height: 260px;
+  }
+
+  .modal-form-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-sismos-table th:nth-child(1),
+  .modal-sismos-table td:nth-child(1),
+  .modal-sismos-table th:nth-child(4),
+  .modal-sismos-table td:nth-child(4),
+  .modal-sismos-table th:nth-child(5),
+  .modal-sismos-table td:nth-child(5) {
+    display: none;
   }
 }
 
@@ -1298,20 +1435,26 @@ tbody tr:hover {
 
           <label class="campo-mapa" for="mapaLatitud">
             <span>Latitud</span>
-            <input id="mapaLatitud" class="inputMapa" name="latitud" type="number" inputmode="decimal" step="any" min="-90" max="90" placeholder="Ej: -19.101" required>
+            <div class="input-sign-row">
+              <input id="mapaLatitud" class="inputMapa" name="latitud" type="text" inputmode="decimal" autocomplete="off" data-min="-90" data-max="90" placeholder="Ej: -19.101" required>
+              <button id="btnSignoLatitud" class="btnSignoCoord" type="button" title="Cambiar signo de latitud" aria-label="Cambiar signo de latitud">±</button>
+            </div>
           </label>
 
           <label class="campo-mapa" for="mapaLongitud">
             <span>Longitud</span>
-            <input id="mapaLongitud" class="inputMapa" name="longitud" type="number" inputmode="decimal" step="any" min="-180" max="180" placeholder="Ej: -69.372" required>
+            <div class="input-sign-row">
+              <input id="mapaLongitud" class="inputMapa" name="longitud" type="text" inputmode="decimal" autocomplete="off" data-min="-180" data-max="180" placeholder="Ej: -69.372" required>
+              <button id="btnSignoLongitud" class="btnSignoCoord" type="button" title="Cambiar signo de longitud" aria-label="Cambiar signo de longitud">±</button>
+            </div>
           </label>
 
           <label class="campo-mapa" for="mapaMagnitud">
             <span>Magnitud</span>
-            <input id="mapaMagnitud" class="inputMapa" name="magnitud" type="number" inputmode="decimal" step="0.1" min="0" max="10" placeholder="Ej: 4.2" required>
+            <input id="mapaMagnitud" class="inputMapa" name="magnitud" type="text" inputmode="decimal" autocomplete="off" data-min="0" data-max="10" placeholder="Ej: 4.2" required>
           </label>
 
-          <div class="form-help-line">Solo valores numéricos. Usa punto decimal, por ejemplo <b>-19.101</b> y <b>4.2</b>.</div>
+          <div class="form-help-line">En celular puedes escribir el número sin signo y usar el botón <b>±</b> para dejar latitud/longitud negativas. Usa punto o coma decimal, por ejemplo <b>-19.101</b> o <b>-19,101</b>.</div>
 
           <div class="modal-form-actions">
             <button id="btnModalGenerarMapa" class="btnModalPrimary" type="button" disabled>Generar</button>
@@ -1442,6 +1585,8 @@ const btnLimpiarFormMapa = document.getElementById("btnLimpiarFormMapa");
 const mapaLatitudInput = document.getElementById("mapaLatitud");
 const mapaLongitudInput = document.getElementById("mapaLongitud");
 const mapaMagnitudInput = document.getElementById("mapaMagnitud");
+const btnSignoLatitud = document.getElementById("btnSignoLatitud");
+const btnSignoLongitud = document.getElementById("btnSignoLongitud");
 const previewMagnitudMapa = document.getElementById("previewMagnitudMapa");
 const previewValoresMapa = document.getElementById("previewValoresMapa");
 const previewBadgeMapa = document.getElementById("previewBadgeMapa");
@@ -1607,14 +1752,34 @@ function cerrarDialogGenerarMapa() {
 }
 
 function valorCampoMapa(input) {
-  return String(input.value || "").trim();
+  return String(input.value || "").trim().replace(",", ".");
 }
 
 function esCampoVacio(input) {
   return String(input.value || "").trim() === "";
 }
 
+function obtenerNumeroInputMapa(input) {
+  const valor = String(input.value || "").trim().replace(",", ".");
+  if (!valor) return NaN;
+  return Number(valor);
+}
+
+function normalizarTextoDecimalInput(input) {
+  const valor = String(input.value || "").trim();
+  if (!valor) return;
+
+  const normalizado = valor
+    .replace(/,/g, ".")
+    .replace(/[^0-9.\-]/g, "")
+    .replace(/(?!^)-/g, "");
+
+  if (normalizado !== valor) input.value = normalizado;
+}
+
 function validarInputMapa(input) {
+  normalizarTextoDecimalInput(input);
+
   const valor = String(input.value || "").trim();
 
   input.setCustomValidity("");
@@ -1624,7 +1789,13 @@ function validarInputMapa(input) {
     return false;
   }
 
-  const numero = Number(valor);
+  if (!/^-?\d+(\.\d+)?$/.test(valor)) {
+    input.setCustomValidity("Ingresa un valor numérico válido. Ejemplo: -19.101");
+    input.classList.add("input-error");
+    return false;
+  }
+
+  const numero = obtenerNumeroInputMapa(input);
 
   if (!Number.isFinite(numero)) {
     input.setCustomValidity("Ingresa un valor numérico válido.");
@@ -1652,6 +1823,21 @@ function validarInputMapa(input) {
 
   input.classList.remove("input-error");
   return true;
+}
+
+function cambiarSignoCoordenada(input) {
+  let valor = String(input.value || "").trim().replace(",", ".");
+
+  if (!valor) {
+    input.value = "-";
+  } else if (valor.startsWith("-")) {
+    input.value = valor.substring(1);
+  } else {
+    input.value = "-" + valor;
+  }
+
+  input.focus();
+  actualizarPreviewFormularioMapa();
 }
 
 function actualizarEstadoBotonGenerarMapa() {
@@ -1838,6 +2024,9 @@ btnCerrarDialogGenerarMapa.addEventListener("click", cerrarDialogGenerarMapa);
     actualizarPreviewFormularioMapa();
   });
 });
+
+btnSignoLatitud.addEventListener("click", () => cambiarSignoCoordenada(mapaLatitudInput));
+btnSignoLongitud.addEventListener("click", () => cambiarSignoCoordenada(mapaLongitudInput));
 
 if (inputBuscarSismoModal) {
   inputBuscarSismoModal.addEventListener("input", renderTablaSismosModal);
