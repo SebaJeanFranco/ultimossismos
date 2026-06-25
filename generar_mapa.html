@@ -46,8 +46,18 @@
       <label>Magnitud
         <input id="magnitud" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 4.2">
       </label>
+      <label>Zoom manual
+        <select id="zoom" style="width:100%;min-height:46px;border:1px solid #31486d;border-radius:12px;background:#0a162a;color:#fff;padding:10px 12px;font-size:16px;font-weight:700">
+          <option value="">Selecciona zoom</option>
+          <option value="5">5 · Muy amplio</option>
+          <option value="6">6 · Amplio</option>
+          <option value="7">7 · Medio</option>
+          <option value="8">8 · Cercano</option>
+          <option value="9">9 · Muy cercano</option>
+        </select>
+      </label>
       <button id="btnGenerar">Generar</button>
-      <div id="estado" class="status">Completa los tres campos.</div>
+      <div id="estado" class="status">Completa latitud, longitud, magnitud y zoom.</div>
     </section>
     <section class="card preview">
       <iframe id="framePreview" srcdoc="<html><body style='margin:0;display:grid;place-items:center;min-height:100vh;background:#07111f;color:#dbeafe;font-family:Arial,sans-serif'>Aquí aparecerá la previsualización del mapa.</body></html>"></iframe>
@@ -55,10 +65,11 @@
   </div>
 
   <script>
-    const MAPA_PREVIEW_WEBAPP_URL = "PEGA_AQUI_TU_URL_DE_WEBAPP_DE_GOOGLE_APPS_SCRIPT";
+    const MAPA_PREVIEW_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwuN9-AjF6fyU_3Y8lkeB-sNFqOijE1LkwC7HWnW7xdukxf0sLKQEAIihlUSxiN5g754A/exec";
     const latitud = document.getElementById('latitud');
     const longitud = document.getElementById('longitud');
     const magnitud = document.getElementById('magnitud');
+    const zoom = document.getElementById('zoom');
     const signoLat = document.getElementById('signoLat');
     const signoLon = document.getElementById('signoLon');
     const btnGenerar = document.getElementById('btnGenerar');
@@ -89,9 +100,10 @@
       const lat = normalizar(latitud.value);
       const lon = normalizar(longitud.value);
       const mag = normalizar(magnitud.value);
+      const zoomValor = normalizar(zoom.value);
 
-      if (!lat || !lon || !mag || isNaN(Number(lat)) || isNaN(Number(lon)) || isNaN(Number(mag))) {
-        estado.textContent = 'Debes completar latitud, longitud y magnitud con valores numéricos.';
+      if (!lat || !lon || !mag || !zoomValor || isNaN(Number(lat)) || isNaN(Number(lon)) || isNaN(Number(mag))) {
+        estado.textContent = 'Debes completar latitud, longitud, magnitud y zoom con valores válidos.';
         return;
       }
 
@@ -100,12 +112,13 @@
         latitud: lat,
         longitud: lon,
         magnitud: mag,
+        zoom: zoomValor,
         ts: Date.now().toString()
       });
 
-      estado.textContent = 'Generando mapa...';
+      estado.textContent = `Generando mapa con zoom ${zoomValor}...`; 
       framePreview.src = MAPA_PREVIEW_WEBAPP_URL + '?' + params.toString();
-      framePreview.onload = () => estado.textContent = 'Mapa generado.';
+      framePreview.onload = () => estado.textContent = `Mapa generado con zoom ${zoomValor}.`; 
     });
   </script>
 </body>
