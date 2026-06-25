@@ -694,6 +694,21 @@ html, body {
   transform: translateY(1px);
 }
 
+.selectMapa {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #93c5fd 50%), linear-gradient(135deg, #93c5fd 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+}
+
+.selectMapa:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
 .form-help-line {
   font-size: 11px;
   color: #91a6c9;
@@ -1429,10 +1444,6 @@ tbody tr:hover {
     <div class="modal-body">
       <form id="formGenerarMapa" class="generar-form-layout">
         <div class="modal-form-card">
-          <p class="modal-help">
-            Ingresa los datos básicos del sismo o selecciona un evento desde DATOS. Al generar, el modal llamará a tu Web App de Google Apps Script para construir el mismo mapa con logo y estrella por magnitud.
-          </p>
-
           <label class="campo-mapa" for="mapaLatitud">
             <span>Latitud</span>
             <div class="input-sign-row">
@@ -1454,7 +1465,19 @@ tbody tr:hover {
             <input id="mapaMagnitud" class="inputMapa" name="magnitud" type="text" inputmode="decimal" autocomplete="off" data-min="0" data-max="10" placeholder="Ej: 4.2" required>
           </label>
 
-          <div class="form-help-line">En celular puedes escribir el número sin signo y usar el botón <b>±</b> para dejar latitud/longitud negativas. Usa punto o coma decimal, por ejemplo <b>-19.101</b> o <b>-19,101</b>.</div>
+          <label class="campo-mapa" for="mapaZoom">
+            <span>Zoom manual</span>
+            <select id="mapaZoom" class="inputMapa selectMapa" name="zoom">
+              <option value="">Selecciona zoom</option>
+              <option value="5">5 · Muy amplio</option>
+              <option value="6">6 · Amplio</option>
+              <option value="7">7 · Medio</option>
+              <option value="8">8 · Cercano</option>
+              <option value="9">9 · Muy cercano</option>
+            </select>
+          </label>
+
+          <div id="ayudaZoomMapa" class="form-help-line">Si eliges un sismo desde la tabla, el zoom se calcula automáticamente según la magnitud. Si ingresas coordenadas manualmente, selecciona el zoom deseado. En celular puedes escribir el número sin signo y usar el botón <b>±</b> para dejar latitud/longitud negativas.</div>
 
           <div class="modal-form-actions">
             <button id="btnModalGenerarMapa" class="btnModalPrimary" type="button" disabled>Generar</button>
@@ -1533,7 +1556,7 @@ tbody tr:hover {
 
 <script>
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRstFFXznf91Eq1IOE0ppef67fPl7lPLOU0j0lmopN6WNv0mZqjrfYFuV-NB-0QWJzc5QsEFWoiPK8y/pub?gid=682229452&single=true&output=csv";
-const MAPA_PREVIEW_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzu_o-nDvH6FmGBDiuYKDfiivjxfFjRX6nK8rGJKpiZOI9cPNiwP8I11FAeOlWSdBdK_A/exec";
+const MAPA_PREVIEW_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwuN9-AjF6fyU_3Y8lkeB-sNFqOijE1LkwC7HWnW7xdukxf0sLKQEAIihlUSxiN5g754A/exec";
 
 
 const map = L.map("map");
@@ -1585,6 +1608,7 @@ const btnLimpiarFormMapa = document.getElementById("btnLimpiarFormMapa");
 const mapaLatitudInput = document.getElementById("mapaLatitud");
 const mapaLongitudInput = document.getElementById("mapaLongitud");
 const mapaMagnitudInput = document.getElementById("mapaMagnitud");
+const mapaZoomSelect = document.getElementById("mapaZoom");
 const btnSignoLatitud = document.getElementById("btnSignoLatitud");
 const btnSignoLongitud = document.getElementById("btnSignoLongitud");
 const previewMagnitudMapa = document.getElementById("previewMagnitudMapa");
@@ -1601,6 +1625,8 @@ const estadoTablaSismosModal = document.getElementById("estadoTablaSismosModal")
 let catalogoSismosModal = [];
 let sismosTablaModalActuales = [];
 let sismoModalSeleccionadoId = null;
+let origenFormularioMapa = "manual";
+let cargaProgramaticaSismoMapa = false;
 
 function activarBotonFiltro(containerId, atributo, valor) {
   const contenedor = document.getElementById(containerId);
@@ -1741,6 +1767,8 @@ document.addEventListener("webkitfullscreenchange", actualizarBotonPantallaCompl
 
 function abrirDialogGenerarMapa() {
   dialogGenerarMapa.classList.add("active");
+  origenFormularioMapa = "manual";
+  mapaZoomSelect.disabled = false;
   renderTablaSismosModal();
   resetPreviewMapaVisual();
   setTimeout(() => mapaLatitudInput.focus(), 60);
@@ -1826,6 +1854,8 @@ function validarInputMapa(input) {
 }
 
 function cambiarSignoCoordenada(input) {
+  activarModoManualMapa();
+
   let valor = String(input.value || "").trim().replace(",", ".");
 
   if (!valor) {
@@ -1840,12 +1870,51 @@ function cambiarSignoCoordenada(input) {
   actualizarPreviewFormularioMapa();
 }
 
+function limpiarSeleccionTablaSismosModal() {
+  if (tablaSismosModal) {
+    tablaSismosModal.querySelectorAll("tr").forEach(row => row.classList.remove("selected"));
+  }
+}
+
+function activarModoManualMapa() {
+  if (cargaProgramaticaSismoMapa) return;
+  origenFormularioMapa = "manual";
+  sismoModalSeleccionadoId = null;
+  mapaZoomSelect.disabled = false;
+  limpiarSeleccionTablaSismosModal();
+}
+
+function activarModoTablaMapa() {
+  origenFormularioMapa = "tabla";
+  mapaZoomSelect.value = "";
+  mapaZoomSelect.disabled = true;
+  mapaZoomSelect.classList.remove("input-error");
+  mapaZoomSelect.setCustomValidity("");
+}
+
+function validarZoomMapa() {
+  mapaZoomSelect.setCustomValidity("");
+  mapaZoomSelect.classList.remove("input-error");
+
+  if (origenFormularioMapa === "tabla") return true;
+
+  const zoom = String(mapaZoomSelect.value || "").trim();
+  if (!zoom) {
+    mapaZoomSelect.setCustomValidity("Selecciona un zoom para la generación manual.");
+    mapaZoomSelect.classList.add("input-error");
+    return false;
+  }
+
+  return true;
+}
+
 function actualizarEstadoBotonGenerarMapa() {
   const latOk = validarInputMapa(mapaLatitudInput);
   const lonOk = validarInputMapa(mapaLongitudInput);
   const magOk = validarInputMapa(mapaMagnitudInput);
+  const zoomOk = validarZoomMapa();
 
-  const formularioCompleto = latOk && lonOk && magOk;
+  const formularioCompleto = latOk && lonOk && magOk && zoomOk;
   btnModalGenerarMapa.disabled = !formularioCompleto;
 
   return formularioCompleto;
@@ -1897,7 +1966,7 @@ function mostrarPreviewError(mensaje) {
   actualizarBadgePreview("Error", "is-error");
 }
 
-function construirUrlPreviewMapa(lat, lon, mag) {
+function construirUrlPreviewMapa(lat, lon, mag, zoom = "") {
   const params = new URLSearchParams({
     action: "previewPage",
     latitud: lat,
@@ -1905,6 +1974,8 @@ function construirUrlPreviewMapa(lat, lon, mag) {
     magnitud: mag,
     ts: Date.now().toString()
   });
+
+  if (zoom) params.set("zoom", zoom);
 
   return `${MAPA_PREVIEW_WEBAPP_URL}?${params.toString()}`;
 }
@@ -1914,13 +1985,15 @@ function actualizarPreviewFormularioMapa() {
   const lon = valorCampoMapa(mapaLongitudInput);
   const mag = valorCampoMapa(mapaMagnitudInput);
 
-  previewValoresMapa.textContent = `Latitud: ${lat || "--"} | Longitud: ${lon || "--"} | Magnitud: ${mag || "--"}`;
+  const zoom = String(mapaZoomSelect.value || "").trim();
+  const zoomTexto = origenFormularioMapa === "tabla" ? "Automático" : (zoom || "--");
+  previewValoresMapa.textContent = `Latitud: ${lat || "--"} | Longitud: ${lon || "--"} | Magnitud: ${mag || "--"} | Zoom: ${zoomTexto}`;
   previewMagnitudMapa.textContent = mag ? `M ${mag}` : "M --";
 
   const formularioCompleto = actualizarEstadoBotonGenerarMapa();
 
-  const algunValor = lat || lon || mag;
-  const algunError = [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput].some(input => !esCampoVacio(input) && !input.checkValidity());
+  const algunValor = lat || lon || mag || zoom;
+  const algunError = [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput, mapaZoomSelect].some(input => !esCampoVacio(input) && !input.checkValidity());
 
   if (!previewMapaLoading.hidden) {
     // Si la generación está en curso, no reseteamos aún la interfaz visual.
@@ -1930,12 +2003,18 @@ function actualizarPreviewFormularioMapa() {
 
   if (formularioCompleto) {
     estadoGenerarMapa.textContent = webAppMapaConfigurada()
-      ? "Formulario válido. Ya puedes generar la previsualización del mapa."
+      ? (origenFormularioMapa === "tabla"
+          ? "Formulario válido. Se usará el zoom automático según la magnitud del sismo seleccionado."
+          : "Formulario válido. Ya puedes generar la previsualización del mapa con el zoom manual seleccionado.")
       : "Formulario válido. Falta configurar la URL del Web App de Google Apps Script en el HTML.";
   } else if (algunError) {
-    estadoGenerarMapa.textContent = "Revisa latitud, longitud y magnitud. Deben estar completos y en el formato correcto.";
+    estadoGenerarMapa.textContent = origenFormularioMapa === "manual"
+      ? "Revisa latitud, longitud, magnitud y zoom. Deben estar completos y en el formato correcto."
+      : "Revisa latitud, longitud y magnitud. Deben estar completos y en el formato correcto.";
   } else if (algunValor) {
-    estadoGenerarMapa.textContent = "Faltan datos por completar para habilitar el botón Generar.";
+    estadoGenerarMapa.textContent = origenFormularioMapa === "manual"
+      ? "Faltan datos por completar, incluyendo el zoom manual, para habilitar el botón Generar."
+      : "Faltan datos por completar para habilitar el botón Generar.";
   } else {
     estadoGenerarMapa.textContent = "Completa los campos para preparar la previsualización.";
   }
@@ -1962,13 +2041,16 @@ function textoBusquedaSismoModal(s) {
 function cargarSismoEnFormularioMapa(s) {
   if (!s) return;
 
+  cargaProgramaticaSismoMapa = true;
   mapaLatitudInput.value = formatearNumeroMapa(s.lat, 4);
   mapaLongitudInput.value = formatearNumeroMapa(s.lon, 4);
   mapaMagnitudInput.value = formatearNumeroMapa(s.mag, 1);
   sismoModalSeleccionadoId = s.idInterno;
+  activarModoTablaMapa();
+  cargaProgramaticaSismoMapa = false;
 
   actualizarPreviewFormularioMapa();
-  estadoGenerarMapa.textContent = `Evento cargado: ${s.fecha} ${s.hora} | ${s.lugar} | M ${s.mag}.`;
+  estadoGenerarMapa.textContent = `Evento cargado: ${s.fecha} ${s.hora} | ${s.lugar} | M ${s.mag}. Se usará zoom automático.`;
 
   if (tablaSismosModal) {
     tablaSismosModal.querySelectorAll("tr").forEach(row => {
@@ -2018,11 +2100,20 @@ btnGenerarMapa.addEventListener("click", abrirDialogGenerarMapa);
 btnCerrarDialogGenerarMapa.addEventListener("click", cerrarDialogGenerarMapa);
 
 [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput].forEach(input => {
-  input.addEventListener("input", actualizarPreviewFormularioMapa);
+  input.addEventListener("input", () => {
+    activarModoManualMapa();
+    actualizarPreviewFormularioMapa();
+  });
   input.addEventListener("blur", () => {
     validarInputMapa(input);
     actualizarPreviewFormularioMapa();
   });
+});
+
+mapaZoomSelect.addEventListener("change", () => {
+  activarModoManualMapa();
+  validarZoomMapa();
+  actualizarPreviewFormularioMapa();
 });
 
 btnSignoLatitud.addEventListener("click", () => cambiarSignoCoordenada(mapaLatitudInput));
@@ -2046,7 +2137,9 @@ if (tablaSismosModal) {
 btnLimpiarFormMapa.addEventListener("click", () => {
   formGenerarMapa.reset();
   sismoModalSeleccionadoId = null;
-  [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput].forEach(input => {
+  origenFormularioMapa = "manual";
+  mapaZoomSelect.disabled = false;
+  [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput, mapaZoomSelect].forEach(input => {
     input.setCustomValidity("");
     input.classList.remove("input-error");
   });
@@ -2072,14 +2165,19 @@ function generarPreviewMapaDesdeBoton() {
   const lat = valorCampoMapa(mapaLatitudInput);
   const lon = valorCampoMapa(mapaLongitudInput);
   const mag = valorCampoMapa(mapaMagnitudInput);
-  const previewUrl = construirUrlPreviewMapa(lat, lon, mag);
+  const zoomManual = origenFormularioMapa === "manual" ? String(mapaZoomSelect.value || "").trim() : "";
+  const previewUrl = construirUrlPreviewMapa(lat, lon, mag, zoomManual);
 
   mostrarLoadingPreviewMapa();
-  estadoGenerarMapa.textContent = `Generando mapa con latitud ${lat}, longitud ${lon} y magnitud ${mag}...`;
+  estadoGenerarMapa.textContent = origenFormularioMapa === "manual"
+    ? `Generando mapa con latitud ${lat}, longitud ${lon}, magnitud ${mag} y zoom ${zoomManual}...`
+    : `Generando mapa con latitud ${lat}, longitud ${lon}, magnitud ${mag} y zoom automático...`;
 
   previewMapaFrame.onload = () => {
     mostrarPreviewLista();
-    estadoGenerarMapa.textContent = `Mapa generado para latitud ${lat}, longitud ${lon} y magnitud ${mag}.`;
+    estadoGenerarMapa.textContent = origenFormularioMapa === "manual"
+      ? `Mapa generado para latitud ${lat}, longitud ${lon}, magnitud ${mag} y zoom ${zoomManual}.`
+      : `Mapa generado para latitud ${lat}, longitud ${lon}, magnitud ${mag} con zoom automático.`;
   };
 
   previewMapaFrame.onerror = () => {
