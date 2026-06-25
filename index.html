@@ -1,0 +1,2437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Monitor Sísmico - Navidad</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+:root {
+  --bg: #020617;
+  --panel: #081225;
+  --panel-2: #0b1730;
+  --border: #1e3358;
+  --border-soft: #28406c;
+  --text: #eef4ff;
+  --muted: #96a7c7;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #e11d48;
+  --blue1: #60a5fa;
+  --blue2: #38bdf8;
+  --blue3: #22d3ee;
+  --blue4: #67e8f9;
+  --amber: #fbbf24;
+  --shadow: 0 10px 28px rgba(0,0,0,0.35);
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Garantiza que los elementos ocultos no se muestren aunque tengan clases con display:flex/grid. */
+[hidden] {
+  display: none !important;
+}
+
+.preview-map-frame[hidden],
+.preview-empty-state[hidden],
+.preview-loading-state[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(56,189,248,0.10), transparent 22%),
+    radial-gradient(circle at top right, rgba(225,29,72,0.08), transparent 20%),
+    linear-gradient(180deg, #020617 0%, #07111f 100%);
+  color: var(--text);
+}
+
+#container {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(380px, 1fr);
+  grid-template-rows: 1.25fr 0.75fr;
+  gap: 10px;
+  height: 100%;
+  padding: 10px;
+}
+
+.box {
+  background: linear-gradient(180deg, rgba(7,17,31,0.98), rgba(5,12,24,0.98));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#resumen-box {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  overflow-y: auto;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-box {
+  position: relative;
+}
+
+.map-box:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: 0;
+  background: #020617;
+}
+
+.map-box:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: 0;
+  background: #020617;
+}
+
+.btnFullscreenMap {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  min-width: 42px;
+  height: 42px;
+  border: 1px solid rgba(30,51,88,0.75);
+  border-radius: 12px;
+  background: rgba(8,18,37,0.92);
+  color: white;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+  transition: 0.16s ease;
+}
+
+.btnFullscreenMap:hover {
+  transform: translateY(-1px);
+  border-color: #60a5fa;
+  background: rgba(15,35,70,0.96);
+}
+
+.btnFullscreenMap.active {
+  background: rgba(225,29,72,0.94);
+  border-color: rgba(255,255,255,0.35);
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  z-index: 9999;
+}
+
+.section-title {
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #ffffff;
+}
+
+.subsection-title {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.panel-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+#ultimo-card {
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, rgba(10,25,53,0.95), rgba(7,17,35,0.95));
+  border-radius: 16px;
+  padding: 12px;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+#ultimo-card:hover {
+  transform: translateY(-1px);
+  border-color: #5b84d6;
+}
+
+.ultimo-label {
+  text-align: center;
+  font-size: 11px;
+  color: #d8e4ff;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+#ultimo-mag {
+  text-align: center;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+#ultimo-info {
+  text-align: center;
+  font-size: 12px;
+  color: #dbeafe;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(8,18,37,0.95), rgba(6,14,28,0.95));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.card-label {
+  font-size: 10px;
+  color: #a8bbda;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+.card b {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.filtros-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(4,10,20,0.45);
+}
+
+.filtros-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btnFiltro {
+  border: none;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: 0.16s ease;
+  box-shadow: 0 5px 14px rgba(0,0,0,0.22);
+}
+
+.btnFiltro:hover {
+  transform: translateY(-1px);
+}
+
+.btnFiltro.active {
+  outline: 2px solid rgba(255,255,255,0.95);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08), 0 8px 18px rgba(0,0,0,0.28);
+}
+
+.btnBase {
+  background: #3a4a66;
+  color: white;
+}
+
+.btnTiempo24 { background: var(--blue1); color: #04111d; }
+.btnTiempo60 { background: var(--blue2); color: #04111d; }
+.btnTiempo30 { background: var(--blue3); color: #04111d; }
+.btnTiempo15 { background: var(--blue4); color: #04111d; }
+.btnTiempo3d { background: #0ea5e9; color: #04111d; }
+.btnTiempo7d { background: #0284c7; color: white; }
+
+.btnMag1 { background: var(--green); color: #07110c; }
+.btnMag2 { background: var(--yellow); color: #111827; }
+.btnMag3 { background: var(--red); color: white; }
+.btnMag4 { background: #7f1d1d; color: white; }
+
+.inputFiltro,
+.selectFiltro {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: #0f1d35;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+}
+
+.inputFiltro::placeholder {
+  color: #7f90af;
+}
+
+.buscador-wrap {
+  position: relative;
+}
+
+.suggestions-box {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 5px);
+  z-index: 1000;
+  max-height: 210px;
+  overflow-y: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #081225;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.38);
+}
+
+.suggestions-box.visible {
+  display: block;
+}
+
+.suggestion-item,
+.suggestion-empty {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgba(40,64,108,0.55);
+  background: transparent;
+  color: var(--text);
+  padding: 9px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.suggestion-item {
+  cursor: pointer;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: rgba(56,189,248,0.16);
+}
+
+.suggestion-empty {
+  color: var(--muted);
+}
+
+.selectFiltro {
+  cursor: pointer;
+}
+
+.filter-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btnReset,
+.btnVisual {
+  border: 1px solid var(--border-soft);
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: white;
+  transition: 0.16s ease;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.24);
+}
+
+.btnReset {
+  background: linear-gradient(180deg, #334155, #1f2937);
+}
+
+.btnVisual {
+  background: linear-gradient(180deg, #1d4ed8, #1e3a8a);
+}
+
+.btnVisual.off {
+  background: linear-gradient(180deg, #475569, #1f2937);
+  color: #cbd5e1;
+}
+
+.btnReset:hover,
+.btnVisual:hover {
+  transform: translateY(-1px);
+}
+
+.result-info {
+  text-align: center;
+  font-size: 11px;
+  color: #b9c8e6;
+  line-height: 1.35;
+  padding: 6px 8px;
+  border: 1px solid rgba(40,64,108,0.65);
+  border-radius: 12px;
+  background: rgba(2,6,23,0.28);
+}
+
+.generar-mapa-panel {
+  flex: 1 1 auto;
+  min-height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.btnGenerarMapa {
+  width: min(420px, 82%);
+  min-height: 64px;
+  border: 1px solid rgba(56,189,248,0.38);
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #eff6ff;
+  background: linear-gradient(180deg, #0ea5e9, #1d4ed8);
+  box-shadow: 0 12px 26px rgba(0,0,0,0.34), 0 0 0 3px rgba(56,189,248,0.10);
+  transition: 0.16s ease;
+}
+
+.btnGenerarMapa:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.65);
+  box-shadow: 0 16px 30px rgba(0,0,0,0.38), 0 0 0 4px rgba(56,189,248,0.14);
+}
+
+.btnGenerarMapa:active {
+  transform: translateY(0);
+}
+
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.68);
+  backdrop-filter: blur(5px);
+  z-index: 10000;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-dialog {
+  width: min(1220px, 96vw);
+  max-height: 92vh;
+  border: 1px solid rgba(96,165,250,0.45);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #0b1730, #061020);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55), 0 0 0 4px rgba(56,189,248,0.10);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalIn 0.18s ease-out;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(40,64,108,0.75);
+  background: rgba(2,6,23,0.24);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(148,163,184,0.35);
+  border-radius: 12px;
+  cursor: pointer;
+  background: rgba(15,23,42,0.85);
+  color: white;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  border-color: rgba(255,255,255,0.7);
+  background: rgba(30,41,59,0.95);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #dbeafe;
+}
+
+.modal-body p {
+  margin: 0 0 10px;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  padding: 0 18px 18px;
+}
+
+.btnModalPrimary {
+  min-width: 160px;
+  min-height: 42px;
+  border: 1px solid rgba(56,189,248,0.45);
+  border-radius: 14px;
+  cursor: pointer;
+  color: #eff6ff;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #0ea5e9, #1d4ed8);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.30);
+}
+
+.btnModalPrimary:hover {
+  transform: translateY(-1px);
+}
+
+.btnModalPrimary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: linear-gradient(180deg, #475569, #334155);
+  border-color: rgba(148,163,184,0.28);
+  box-shadow: none;
+  transform: none;
+}
+
+.inputMapa.input-error {
+  border-color: rgba(248,113,113,0.95);
+  box-shadow: 0 0 0 3px rgba(248,113,113,0.16);
+}
+
+.btnModalSecondary {
+  min-width: 130px;
+  min-height: 42px;
+  border: 1px solid rgba(148,163,184,0.36);
+  border-radius: 14px;
+  cursor: pointer;
+  color: #e5edff;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #334155, #1f2937);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.22);
+}
+
+.btnModalSecondary:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.58);
+}
+
+.generar-form-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(560px, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.modal-form-card,
+.modal-preview-card {
+  border: 1px solid rgba(40,64,108,0.82);
+  border-radius: 18px;
+  background: rgba(2,6,23,0.30);
+  padding: 14px;
+  min-width: 0;
+}
+
+.modal-form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-help {
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.campo-mapa {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.campo-mapa span {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #c7d8f7;
+}
+
+.inputMapa {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 9px 11px;
+  outline: none;
+  background: #0f1f3a;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.inputMapa:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.16);
+}
+
+.form-help-line {
+  font-size: 11px;
+  color: #91a6c9;
+  margin-top: -4px;
+}
+
+.modal-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.preview-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.preview-title-row h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.preview-badge {
+  border: 1px solid rgba(56,189,248,0.25);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(14,165,233,0.10);
+  color: #bae6fd;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+
+.preview-badge.is-loading {
+  border-color: rgba(251,191,36,0.34);
+  background: rgba(251,191,36,0.10);
+  color: #fde68a;
+}
+
+.preview-badge.is-ready {
+  border-color: rgba(34,197,94,0.32);
+  background: rgba(34,197,94,0.10);
+  color: #bbf7d0;
+}
+
+.preview-badge.is-error {
+  border-color: rgba(248,113,113,0.32);
+  background: rgba(248,113,113,0.10);
+  color: #fecaca;
+}
+
+.preview-map-placeholder {
+  flex: 1;
+  min-height: 460px;
+  border: 1px solid rgba(96,165,250,0.30);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(14,165,233,0.20), transparent 28%),
+    radial-gradient(circle at 70% 28%, rgba(34,197,94,0.16), transparent 20%),
+    radial-gradient(circle at 32% 72%, rgba(251,191,36,0.12), transparent 18%),
+    linear-gradient(180deg, #10213b 0%, #07111f 100%);
+}
+
+.preview-map-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #07111f;
+  z-index: 4;
+}
+
+.preview-empty-state,
+.preview-loading-state {
+  position: absolute;
+  inset: 0;
+}
+
+.preview-map-placeholder::before {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border: 1px dashed rgba(226,232,240,0.18);
+  border-radius: 14px;
+}
+
+.preview-grid-lines {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.6;
+}
+
+.preview-marker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-star {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  color: #22c55e;
+  font-size: 64px;
+  line-height: 1;
+  text-shadow: 0 8px 18px rgba(0,0,0,0.50);
+}
+
+.preview-mag {
+  min-width: 90px;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(34,197,94,0.42);
+  background: rgba(2,6,23,0.76);
+  color: #d1fae5;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.preview-placeholder-text {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(2,6,23,0.72);
+  color: #dbeafe;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+
+.preview-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 5;
+  background: rgba(2, 6, 23, 0.76);
+  backdrop-filter: blur(2px);
+}
+
+.preview-spinner {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 4px solid rgba(255,255,255,0.14);
+  border-top-color: #38bdf8;
+  animation: spinPreview 0.9s linear infinite;
+}
+
+.preview-loading-text {
+  max-width: 280px;
+  text-align: center;
+  color: #dbeafe;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@keyframes spinPreview {
+  to { transform: rotate(360deg); }
+}
+
+.preview-values {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(40,64,108,0.7);
+  border-radius: 12px;
+  background: rgba(15,23,42,0.56);
+  color: #c7d8f7;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.modal-status {
+  margin-top: 4px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(40,64,108,0.64);
+  border-radius: 12px;
+  background: rgba(2,6,23,0.28);
+  color: #b9c8e6;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.modal-sismos-card {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(40,64,108,0.82);
+  border-radius: 18px;
+  background: rgba(2,6,23,0.30);
+  padding: 14px;
+  min-width: 0;
+}
+
+.modal-sismos-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.modal-sismos-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.modal-sismos-title h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.modal-sismos-title span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.modal-sismos-search {
+  width: min(420px, 100%);
+}
+
+.modal-sismos-scroll {
+  max-height: 255px;
+  overflow: auto;
+  border: 1px solid rgba(40,64,108,0.70);
+  border-radius: 14px;
+  background: rgba(2,6,23,0.24);
+}
+
+.modal-sismos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.modal-sismos-table th,
+.modal-sismos-table td {
+  padding: 8px 9px;
+  border-bottom: 1px solid rgba(40,64,108,0.58);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.modal-sismos-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #132544;
+  color: #ffffff;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+}
+
+.modal-sismos-table td:nth-child(3) {
+  text-align: left;
+  white-space: normal;
+  min-width: 260px;
+}
+
+.modal-sismos-table tbody tr {
+  transition: 0.14s ease;
+}
+
+.modal-sismos-table tbody tr:hover {
+  background: rgba(14,165,233,0.12);
+  cursor: pointer;
+}
+
+.modal-sismos-table tbody tr.selected {
+  background: rgba(34,197,94,0.14);
+  outline: 1px solid rgba(34,197,94,0.38);
+}
+
+.modal-sismos-empty {
+  padding: 18px;
+  color: #91a6c9;
+  text-align: center;
+  font-size: 12px;
+}
+
+.modal-sismos-status {
+  margin-top: 8px;
+  color: #91a6c9;
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .modal-dialog {
+    width: min(720px, 96vw);
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .generar-form-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-map-placeholder {
+    min-height: 320px;
+  }
+
+  .modal-sismos-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .modal-sismos-search {
+    width: 100%;
+  }
+}
+
+.btnPercibidos {
+  width: 100%;
+  border: 1px solid rgba(251,191,36,0.22);
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  background: linear-gradient(180deg, #26354d, #182437);
+  color: white;
+  transition: 0.16s ease;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.24);
+}
+
+.btnPercibidos:hover {
+  transform: translateY(-1px);
+}
+
+.btnPercibidos.active {
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
+  color: #111827;
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.18), 0 8px 18px rgba(0,0,0,0.28);
+}
+
+
+#tabla-container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabla-scroll {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(2,6,23,0.30);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: #142340;
+  color: #ffffff;
+  z-index: 2;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+th, td {
+  padding: 9px 8px;
+  border-bottom: 1px solid rgba(41,61,96,0.7);
+  text-align: center;
+}
+
+tbody tr:hover {
+  background: rgba(20,35,64,0.75);
+  cursor: pointer;
+}
+
+
+.divider {
+  border: none;
+  border-top: 1px solid rgba(51,65,85,0.8);
+  margin: 10px 0;
+}
+
+
+.label {
+  transform: translate(-50%, -140%);
+}
+
+.bounce-label {
+  display: inline-block;
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%   { transform: scale(1); opacity: 1; }
+  50%  { transform: scale(1.08); opacity: 0.72; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.blink {
+  animation: blinkAnim 1s infinite;
+}
+
+@keyframes blinkAnim {
+  0% { opacity: 1; }
+  50% { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #0f172a;
+  color: white;
+  border: 1px solid #334155;
+}
+
+@media (max-width: 1200px) {
+  #container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 42vh auto auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  html, body {
+    overflow: auto;
+  }
+
+  #resumen-box {
+    grid-column: auto;
+    grid-row: auto;
+    overflow: visible;
+  }
+
+  .generar-mapa-panel {
+    min-height: 110px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">⏳ Obteniendo datos...</div>
+
+<div id="container">
+
+  <div class="box map-box" id="map-box">
+    <button id="btnFullscreenMap" class="btnFullscreenMap" type="button" title="Ver mapa en pantalla completa" aria-label="Ver mapa en pantalla completa">⛶</button>
+    <div id="map"></div>
+  </div>
+
+  <div class="box" id="resumen-box">
+    <div class="panel-body">
+
+      <h3 class="section-title">RESUMEN GENERAL</h3>
+
+      <div id="ultimo-card">
+        <div class="ultimo-label">Último sismo</div>
+        <div id="ultimo-mag" class="blink">--</div>
+        <div id="ultimo-info">--</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card">
+          <div class="card-label">Total</div>
+          <b id="total">0</b>
+        </div>
+        <div class="card">
+          <div class="card-label">Máx</div>
+          <b id="max">0</b>
+        </div>
+        <div class="card">
+          <div class="card-label">Prom</div>
+          <b id="prom">0</b>
+        </div>
+        <div class="card">
+          <div class="card-label">Percibidos</div>
+          <b id="perc">0</b>
+        </div>
+      </div>
+
+      <div class="filtros-wrap">
+
+        <div>
+          <div class="subsection-title">Filtro de tiempo</div>
+          <div id="filtroTiempo" class="filtros-row">
+            <button class="btnFiltro btnTiempo60" data-time="60">1 hora</button>
+            <button class="btnFiltro btnTiempo30" data-time="360">6 horas</button>
+            <button class="btnFiltro btnTiempo24 active" data-time="1440">24 horas</button>
+            <button class="btnFiltro btnTiempo3d" data-time="4320">3 días</button>
+            <button class="btnFiltro btnTiempo7d" data-time="10080">7 días</button>
+            <button class="btnFiltro btnBase" data-time="0">Todas</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="subsection-title">Filtro de magnitud</div>
+          <div id="filtroMagnitud" class="filtros-row">
+            <button class="btnFiltro btnBase active" data-mag="0">Todas</button>
+            <button class="btnFiltro btnMag1" data-mag="1">&lt; 3.5</button>
+            <button class="btnFiltro btnMag2" data-mag="2">3.5 – 3.9</button>
+            <button class="btnFiltro btnMag3" data-mag="3">≥ 4.0</button>
+            <button class="btnFiltro btnMag4" data-mag="4">≥ 5.0</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="subsection-title">Buscar por lugar</div>
+          <div class="buscador-wrap">
+            <input id="buscarLugar" class="inputFiltro" type="search" autocomplete="off" placeholder="Ej: Calama, Navidad, Socaire">
+            <div id="sugerenciasLugar" class="suggestions-box"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="subsection-title">Máximo de registros mostrados</div>
+          <select id="limiteRegistros" class="selectFiltro">
+            <option value="100">100 registros</option>
+            <option value="300" selected>300 registros</option>
+            <option value="500">500 registros</option>
+            <option value="1000">1000 registros</option>
+            <option value="0">Todos los filtrados</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="subsection-title">Percibidos</div>
+          <button id="btnPercibidos" class="btnPercibidos">VER PERCIBIDOS</button>
+        </div>
+
+        <div class="filter-actions">
+          <button id="btnEtiquetas" class="btnVisual">ETIQUETAS ON</button>
+          <button id="btnReset" class="btnReset">REINICIAR</button>
+        </div>
+
+        <div id="estadoFiltros" class="result-info">Mostrando últimas 24 horas.</div>
+      </div>
+
+      <div class="generar-mapa-panel">
+        <button id="btnGenerarMapa" class="btnGenerarMapa" type="button">Generar mapa</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="box" id="tabla-container">
+    <h3 class="section-title" style="margin-bottom:12px;">SISMOS</h3>
+    <div class="tabla-scroll">
+      <table id="tabla">
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>Fecha/Hora</th>
+            <th>Referencia</th>
+            <th>Prof</th>
+            <th>Mag</th>
+            <th>Percibido</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+
+
+<div id="dialogGenerarMapa" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="dialogGenerarMapaTitulo">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="dialogGenerarMapaTitulo">Generar mapa</h3>
+      <button id="btnCerrarDialogGenerarMapa" class="modal-close" type="button" aria-label="Cerrar ventana">×</button>
+    </div>
+
+    <div class="modal-body">
+      <form id="formGenerarMapa" class="generar-form-layout">
+        <div class="modal-form-card">
+          <p class="modal-help">
+            Ingresa los datos básicos del sismo o selecciona un evento desde DATOS. Al generar, el modal llamará a tu Web App de Google Apps Script para construir el mismo mapa con logo y estrella por magnitud.
+          </p>
+
+          <label class="campo-mapa" for="mapaLatitud">
+            <span>Latitud</span>
+            <input id="mapaLatitud" class="inputMapa" name="latitud" type="number" inputmode="decimal" step="any" min="-90" max="90" placeholder="Ej: -19.101" required>
+          </label>
+
+          <label class="campo-mapa" for="mapaLongitud">
+            <span>Longitud</span>
+            <input id="mapaLongitud" class="inputMapa" name="longitud" type="number" inputmode="decimal" step="any" min="-180" max="180" placeholder="Ej: -69.372" required>
+          </label>
+
+          <label class="campo-mapa" for="mapaMagnitud">
+            <span>Magnitud</span>
+            <input id="mapaMagnitud" class="inputMapa" name="magnitud" type="number" inputmode="decimal" step="0.1" min="0" max="10" placeholder="Ej: 4.2" required>
+          </label>
+
+          <div class="form-help-line">Solo valores numéricos. Usa punto decimal, por ejemplo <b>-19.101</b> y <b>4.2</b>.</div>
+
+          <div class="modal-form-actions">
+            <button id="btnModalGenerarMapa" class="btnModalPrimary" type="button" disabled>Generar</button>
+            <button id="btnLimpiarFormMapa" class="btnModalSecondary" type="button">Limpiar</button>
+          </div>
+
+          <div id="estadoGenerarMapa" class="modal-status">Completa los campos para preparar la previsualización.</div>
+        </div>
+
+        <div class="modal-preview-card">
+          <div class="preview-title-row">
+            <h4>Previsualización</h4>
+            <span id="previewBadgeMapa" class="preview-badge">Pendiente</span>
+          </div>
+
+          <div class="preview-map-placeholder" aria-label="Área de previsualización del mapa">
+            <div id="previewMapaEmpty" class="preview-empty-state">
+              <div class="preview-grid-lines"></div>
+              <div class="preview-marker">
+                <div class="preview-star">★</div>
+                <div id="previewMagnitudMapa" class="preview-mag">M --</div>
+              </div>
+              <div id="previewPlaceholderText" class="preview-placeholder-text">
+                Aquí se mostrará la previsualización del mapa generado desde Google Apps Script.
+              </div>
+            </div>
+
+            <div id="previewMapaLoading" class="preview-loading-state" hidden>
+              <div class="preview-spinner" aria-hidden="true"></div>
+              <div class="preview-loading-text">Generando mapa... Esto puede tardar unos segundos mientras se renderiza la diapositiva.</div>
+            </div>
+
+            <iframe id="previewMapaFrame" class="preview-map-frame" title="Previsualización del mapa" hidden></iframe>
+          </div>
+
+          <div id="previewValoresMapa" class="preview-values">Latitud: -- | Longitud: -- | Magnitud: --</div>
+        </div>
+
+        <div class="modal-sismos-card">
+          <div class="modal-sismos-head">
+            <div class="modal-sismos-title">
+              <h4>Seleccionar desde DATOS</h4>
+              <span>Haz clic en un evento para cargar automáticamente latitud, longitud y magnitud.</span>
+            </div>
+            <div class="modal-sismos-search">
+              <input id="buscarSismoModal" class="inputMapa" type="text" placeholder="Buscar por lugar, fecha o magnitud...">
+            </div>
+          </div>
+
+          <div class="modal-sismos-scroll">
+            <table class="modal-sismos-table">
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Fecha/Hora</th>
+                  <th>Lugar</th>
+                  <th>Lat</th>
+                  <th>Lon</th>
+                  <th>Mag</th>
+                </tr>
+              </thead>
+              <tbody id="tablaSismosModal">
+                <tr><td colspan="6"><div class="modal-sismos-empty">Cargando últimos sismos...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div id="estadoTablaSismosModal" class="modal-sismos-status">Se mostrarán los últimos 10 registros disponibles.</div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRstFFXznf91Eq1IOE0ppef67fPl7lPLOU0j0lmopN6WNv0mZqjrfYFuV-NB-0QWJzc5QsEFWoiPK8y/pub?gid=682229452&single=true&output=csv";
+const MAPA_PREVIEW_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzu_o-nDvH6FmGBDiuYKDfiivjxfFjRX6nK8rGJKpiZOI9cPNiwP8I11FAeOlWSdBdK_A/exec";
+
+
+const map = L.map("map");
+
+const chileBounds = [
+  [-56, -76],
+  [-17, -66]
+];
+
+map.fitBounds(chileBounds);
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  attribution: "&copy; OpenStreetMap & CARTO"
+}).addTo(map);
+
+let layer = L.layerGroup().addTo(map);
+
+let ultimoSismoGlobal = null;
+let ultimoCircleGlobal = null;
+
+const FILTRO_TIEMPO_DEFAULT = 1440; // 24 horas en minutos
+const LIMITE_REGISTROS_DEFAULT = 300;
+
+let filtroMagnitud = 0;
+let filtroTiempoMin = FILTRO_TIEMPO_DEFAULT;
+let filtroPercibidos = false;
+let filtroTexto = "";
+let limiteRegistros = LIMITE_REGISTROS_DEFAULT;
+let mostrarEtiquetas = true;
+let lugaresDisponibles = [];
+let sugerenciasActuales = [];
+
+const tabla = document.querySelector("#tabla tbody");
+const btnPercibidos = document.getElementById("btnPercibidos");
+const inputBuscarLugar = document.getElementById("buscarLugar");
+const sugerenciasLugar = document.getElementById("sugerenciasLugar");
+const selectLimiteRegistros = document.getElementById("limiteRegistros");
+const btnReset = document.getElementById("btnReset");
+const btnEtiquetas = document.getElementById("btnEtiquetas");
+const estadoFiltros = document.getElementById("estadoFiltros");
+const mapBox = document.getElementById("map-box");
+const btnFullscreenMap = document.getElementById("btnFullscreenMap");
+const btnGenerarMapa = document.getElementById("btnGenerarMapa");
+const dialogGenerarMapa = document.getElementById("dialogGenerarMapa");
+const btnCerrarDialogGenerarMapa = document.getElementById("btnCerrarDialogGenerarMapa");
+const formGenerarMapa = document.getElementById("formGenerarMapa");
+const btnModalGenerarMapa = document.getElementById("btnModalGenerarMapa");
+const btnLimpiarFormMapa = document.getElementById("btnLimpiarFormMapa");
+const mapaLatitudInput = document.getElementById("mapaLatitud");
+const mapaLongitudInput = document.getElementById("mapaLongitud");
+const mapaMagnitudInput = document.getElementById("mapaMagnitud");
+const previewMagnitudMapa = document.getElementById("previewMagnitudMapa");
+const previewValoresMapa = document.getElementById("previewValoresMapa");
+const previewBadgeMapa = document.getElementById("previewBadgeMapa");
+const previewMapaEmpty = document.getElementById("previewMapaEmpty");
+const previewMapaLoading = document.getElementById("previewMapaLoading");
+const previewMapaFrame = document.getElementById("previewMapaFrame");
+const previewPlaceholderText = document.getElementById("previewPlaceholderText");
+const estadoGenerarMapa = document.getElementById("estadoGenerarMapa");
+const inputBuscarSismoModal = document.getElementById("buscarSismoModal");
+const tablaSismosModal = document.getElementById("tablaSismosModal");
+const estadoTablaSismosModal = document.getElementById("estadoTablaSismosModal");
+let catalogoSismosModal = [];
+let sismosTablaModalActuales = [];
+let sismoModalSeleccionadoId = null;
+
+function activarBotonFiltro(containerId, atributo, valor) {
+  const contenedor = document.getElementById(containerId);
+  contenedor.querySelectorAll(".btnFiltro").forEach(b => b.classList.remove("active"));
+  const btn = contenedor.querySelector(`[${atributo}="${valor}"]`);
+  if (btn) btn.classList.add("active");
+}
+
+document.querySelectorAll("#filtroTiempo .btnFiltro").forEach(btn => {
+  btn.addEventListener("click", () => {
+    filtroTiempoMin = Number(btn.dataset.time);
+    activarBotonFiltro("filtroTiempo", "data-time", filtroTiempoMin);
+    loadData();
+  });
+});
+
+document.querySelectorAll("#filtroMagnitud .btnFiltro").forEach(btn => {
+  btn.addEventListener("click", () => {
+    filtroMagnitud = Number(btn.dataset.mag);
+    activarBotonFiltro("filtroMagnitud", "data-mag", filtroMagnitud);
+    loadData();
+  });
+});
+
+btnPercibidos.addEventListener("click", () => {
+  filtroPercibidos = !filtroPercibidos;
+  btnPercibidos.classList.toggle("active", filtroPercibidos);
+  loadData();
+});
+
+let debounceBusqueda = null;
+
+inputBuscarLugar.addEventListener("input", () => {
+  filtroTexto = inputBuscarLugar.value;
+  mostrarSugerenciasLugar();
+
+  clearTimeout(debounceBusqueda);
+  debounceBusqueda = setTimeout(loadData, 180);
+});
+
+inputBuscarLugar.addEventListener("focus", mostrarSugerenciasLugar);
+inputBuscarLugar.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") ocultarSugerenciasLugar();
+});
+
+sugerenciasLugar.addEventListener("mousedown", (event) => {
+  const item = event.target.closest(".suggestion-item");
+  if (!item) return;
+
+  event.preventDefault();
+  const index = Number(item.dataset.index);
+  const lugar = sugerenciasActuales[index];
+  if (!lugar) return;
+
+  inputBuscarLugar.value = lugar;
+  filtroTexto = lugar;
+  ocultarSugerenciasLugar();
+  loadData();
+});
+
+window.addEventListener("click", (event) => {
+  if (!event.target.closest(".buscador-wrap")) ocultarSugerenciasLugar();
+});
+
+selectLimiteRegistros.addEventListener("change", () => {
+  limiteRegistros = Number(selectLimiteRegistros.value);
+  loadData();
+});
+
+btnEtiquetas.addEventListener("click", () => {
+  mostrarEtiquetas = !mostrarEtiquetas;
+  btnEtiquetas.classList.toggle("off", !mostrarEtiquetas);
+  btnEtiquetas.innerText = mostrarEtiquetas ? "ETIQUETAS ON" : "ETIQUETAS OFF";
+  loadData();
+});
+
+btnReset.addEventListener("click", () => {
+  filtroTiempoMin = FILTRO_TIEMPO_DEFAULT;
+  filtroMagnitud = 0;
+  filtroPercibidos = false;
+  filtroTexto = "";
+  limiteRegistros = LIMITE_REGISTROS_DEFAULT;
+  mostrarEtiquetas = true;
+
+  activarBotonFiltro("filtroTiempo", "data-time", filtroTiempoMin);
+  activarBotonFiltro("filtroMagnitud", "data-mag", filtroMagnitud);
+  btnPercibidos.classList.remove("active");
+  inputBuscarLugar.value = "";
+  selectLimiteRegistros.value = String(LIMITE_REGISTROS_DEFAULT);
+  btnEtiquetas.classList.remove("off");
+  btnEtiquetas.innerText = "ETIQUETAS ON";
+  ocultarSugerenciasLugar();
+
+  loadData();
+});
+
+function getFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function requestFullscreen(element) {
+  if (element.requestFullscreen) return element.requestFullscreen();
+  if (element.webkitRequestFullscreen) return element.webkitRequestFullscreen();
+  return Promise.reject(new Error("Pantalla completa no soportada"));
+}
+
+function exitFullscreen() {
+  if (document.exitFullscreen) return document.exitFullscreen();
+  if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+  return Promise.resolve();
+}
+
+function actualizarBotonPantallaCompleta() {
+  const activo = getFullscreenElement() === mapBox;
+  btnFullscreenMap.classList.toggle("active", activo);
+  btnFullscreenMap.innerText = activo ? "×" : "⛶";
+  btnFullscreenMap.title = activo ? "Salir de pantalla completa" : "Ver mapa en pantalla completa";
+  btnFullscreenMap.setAttribute("aria-label", btnFullscreenMap.title);
+
+  setTimeout(() => map.invalidateSize(), 180);
+}
+
+btnFullscreenMap.addEventListener("click", () => {
+  const activo = getFullscreenElement() === mapBox;
+
+  if (activo) {
+    exitFullscreen().catch(console.error);
+  } else {
+    requestFullscreen(mapBox).catch(err => {
+      console.error(err);
+      alert("Tu navegador no permitió abrir el mapa en pantalla completa.");
+    });
+  }
+});
+
+document.addEventListener("fullscreenchange", actualizarBotonPantallaCompleta);
+document.addEventListener("webkitfullscreenchange", actualizarBotonPantallaCompleta);
+
+function abrirDialogGenerarMapa() {
+  dialogGenerarMapa.classList.add("active");
+  renderTablaSismosModal();
+  resetPreviewMapaVisual();
+  setTimeout(() => mapaLatitudInput.focus(), 60);
+}
+
+function cerrarDialogGenerarMapa() {
+  dialogGenerarMapa.classList.remove("active");
+  btnGenerarMapa.focus();
+}
+
+function valorCampoMapa(input) {
+  return String(input.value || "").trim();
+}
+
+function esCampoVacio(input) {
+  return String(input.value || "").trim() === "";
+}
+
+function validarInputMapa(input) {
+  const valor = String(input.value || "").trim();
+
+  input.setCustomValidity("");
+
+  if (!valor) {
+    input.classList.remove("input-error");
+    return false;
+  }
+
+  const numero = Number(valor);
+
+  if (!Number.isFinite(numero)) {
+    input.setCustomValidity("Ingresa un valor numérico válido.");
+    input.classList.add("input-error");
+    return false;
+  }
+
+  if (input === mapaLatitudInput && (numero < -90 || numero > 90)) {
+    input.setCustomValidity("La latitud debe estar entre -90 y 90.");
+    input.classList.add("input-error");
+    return false;
+  }
+
+  if (input === mapaLongitudInput && (numero < -180 || numero > 180)) {
+    input.setCustomValidity("La longitud debe estar entre -180 y 180.");
+    input.classList.add("input-error");
+    return false;
+  }
+
+  if (input === mapaMagnitudInput && (numero < 0 || numero > 10)) {
+    input.setCustomValidity("La magnitud debe estar entre 0 y 10.");
+    input.classList.add("input-error");
+    return false;
+  }
+
+  input.classList.remove("input-error");
+  return true;
+}
+
+function actualizarEstadoBotonGenerarMapa() {
+  const latOk = validarInputMapa(mapaLatitudInput);
+  const lonOk = validarInputMapa(mapaLongitudInput);
+  const magOk = validarInputMapa(mapaMagnitudInput);
+
+  const formularioCompleto = latOk && lonOk && magOk;
+  btnModalGenerarMapa.disabled = !formularioCompleto;
+
+  return formularioCompleto;
+}
+
+function webAppMapaConfigurada() {
+  return MAPA_PREVIEW_WEBAPP_URL && !MAPA_PREVIEW_WEBAPP_URL.includes("PEGA_AQUI");
+}
+
+function actualizarBadgePreview(texto, estado) {
+  previewBadgeMapa.textContent = texto;
+  previewBadgeMapa.classList.remove("is-loading", "is-ready", "is-error");
+  if (estado) previewBadgeMapa.classList.add(estado);
+}
+
+function resetPreviewMapaVisual() {
+  previewMapaFrame.onload = null;
+  previewMapaFrame.onerror = null;
+  previewMapaFrame.hidden = true;
+  previewMapaFrame.removeAttribute("src");
+  previewMapaLoading.hidden = true;
+  previewMapaEmpty.hidden = false;
+  previewPlaceholderText.textContent = webAppMapaConfigurada()
+    ? "Aquí se mostrará la previsualización del mapa generado desde Google Apps Script."
+    : "Primero configura la constante MAPA_PREVIEW_WEBAPP_URL en este HTML con la URL de tu Web App de Google Apps Script.";
+  actualizarBadgePreview("Pendiente", null);
+}
+
+function mostrarLoadingPreviewMapa() {
+  previewMapaFrame.hidden = true;
+  previewMapaLoading.hidden = false;
+  previewMapaEmpty.hidden = false;
+  previewPlaceholderText.textContent = "Se está generando la imagen del mapa. Espera unos segundos...";
+  actualizarBadgePreview("Generando", "is-loading");
+}
+
+function mostrarPreviewLista() {
+  previewMapaLoading.hidden = true;
+  previewMapaEmpty.hidden = true;
+  previewMapaFrame.hidden = false;
+  actualizarBadgePreview("Listo", "is-ready");
+}
+
+function mostrarPreviewError(mensaje) {
+  previewMapaLoading.hidden = true;
+  previewMapaFrame.hidden = true;
+  previewMapaEmpty.hidden = false;
+  previewPlaceholderText.textContent = mensaje;
+  actualizarBadgePreview("Error", "is-error");
+}
+
+function construirUrlPreviewMapa(lat, lon, mag) {
+  const params = new URLSearchParams({
+    action: "previewPage",
+    latitud: lat,
+    longitud: lon,
+    magnitud: mag,
+    ts: Date.now().toString()
+  });
+
+  return `${MAPA_PREVIEW_WEBAPP_URL}?${params.toString()}`;
+}
+
+function actualizarPreviewFormularioMapa() {
+  const lat = valorCampoMapa(mapaLatitudInput);
+  const lon = valorCampoMapa(mapaLongitudInput);
+  const mag = valorCampoMapa(mapaMagnitudInput);
+
+  previewValoresMapa.textContent = `Latitud: ${lat || "--"} | Longitud: ${lon || "--"} | Magnitud: ${mag || "--"}`;
+  previewMagnitudMapa.textContent = mag ? `M ${mag}` : "M --";
+
+  const formularioCompleto = actualizarEstadoBotonGenerarMapa();
+
+  const algunValor = lat || lon || mag;
+  const algunError = [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput].some(input => !esCampoVacio(input) && !input.checkValidity());
+
+  if (!previewMapaLoading.hidden) {
+    // Si la generación está en curso, no reseteamos aún la interfaz visual.
+  } else {
+    resetPreviewMapaVisual();
+  }
+
+  if (formularioCompleto) {
+    estadoGenerarMapa.textContent = webAppMapaConfigurada()
+      ? "Formulario válido. Ya puedes generar la previsualización del mapa."
+      : "Formulario válido. Falta configurar la URL del Web App de Google Apps Script en el HTML.";
+  } else if (algunError) {
+    estadoGenerarMapa.textContent = "Revisa latitud, longitud y magnitud. Deben estar completos y en el formato correcto.";
+  } else if (algunValor) {
+    estadoGenerarMapa.textContent = "Faltan datos por completar para habilitar el botón Generar.";
+  } else {
+    estadoGenerarMapa.textContent = "Completa los campos para preparar la previsualización.";
+  }
+}
+
+function formatearNumeroMapa(valor, decimales = 3) {
+  if (!Number.isFinite(valor)) return "";
+  return Number(valor.toFixed(decimales)).toString();
+}
+
+function textoBusquedaSismoModal(s) {
+  return [
+    s.n,
+    s.fecha,
+    s.hora,
+    s.lugar,
+    s.lat,
+    s.lon,
+    s.mag,
+    s.percibido
+  ].join(" ");
+}
+
+function cargarSismoEnFormularioMapa(s) {
+  if (!s) return;
+
+  mapaLatitudInput.value = formatearNumeroMapa(s.lat, 4);
+  mapaLongitudInput.value = formatearNumeroMapa(s.lon, 4);
+  mapaMagnitudInput.value = formatearNumeroMapa(s.mag, 1);
+  sismoModalSeleccionadoId = s.idInterno;
+
+  actualizarPreviewFormularioMapa();
+  estadoGenerarMapa.textContent = `Evento cargado: ${s.fecha} ${s.hora} | ${s.lugar} | M ${s.mag}.`;
+
+  if (tablaSismosModal) {
+    tablaSismosModal.querySelectorAll("tr").forEach(row => {
+      row.classList.toggle("selected", row.dataset.id === s.idInterno);
+    });
+  }
+}
+
+function renderTablaSismosModal() {
+  if (!tablaSismosModal) return;
+
+  const texto = inputBuscarSismoModal ? inputBuscarSismoModal.value.trim() : "";
+  const busqueda = normalizarTexto(texto);
+
+  let lista = [...catalogoSismosModal];
+
+  if (busqueda) {
+    lista = lista.filter(s => normalizarTexto(textoBusquedaSismoModal(s)).includes(busqueda));
+  }
+
+  sismosTablaModalActuales = lista.slice(0, 10);
+
+  if (!sismosTablaModalActuales.length) {
+    tablaSismosModal.innerHTML = '<tr><td colspan="6"><div class="modal-sismos-empty">No hay coincidencias para la búsqueda.</div></td></tr>';
+    if (estadoTablaSismosModal) estadoTablaSismosModal.textContent = texto ? `Sin coincidencias para "${texto}".` : "No hay registros disponibles.";
+    return;
+  }
+
+  tablaSismosModal.innerHTML = sismosTablaModalActuales.map((s, index) => `
+    <tr data-index="${index}" data-id="${escapeHTML(s.idInterno)}" class="${s.idInterno === sismoModalSeleccionadoId ? "selected" : ""}">
+      <td>${Number.isFinite(s.n) ? s.n : ""}</td>
+      <td>${escapeHTML(`${s.fecha} ${s.hora}`)}</td>
+      <td>${escapeHTML(s.lugar)}</td>
+      <td>${formatearNumeroMapa(s.lat, 4)}</td>
+      <td>${formatearNumeroMapa(s.lon, 4)}</td>
+      <td>${formatearNumeroMapa(s.mag, 1)}</td>
+    </tr>
+  `).join("");
+
+  if (estadoTablaSismosModal) {
+    const base = texto ? `Mostrando hasta 10 coincidencias para "${texto}".` : "Mostrando los últimos 10 registros de DATOS.";
+    estadoTablaSismosModal.textContent = base + " Selecciona una fila para completar el formulario.";
+  }
+}
+
+btnGenerarMapa.addEventListener("click", abrirDialogGenerarMapa);
+btnCerrarDialogGenerarMapa.addEventListener("click", cerrarDialogGenerarMapa);
+
+[mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput].forEach(input => {
+  input.addEventListener("input", actualizarPreviewFormularioMapa);
+  input.addEventListener("blur", () => {
+    validarInputMapa(input);
+    actualizarPreviewFormularioMapa();
+  });
+});
+
+if (inputBuscarSismoModal) {
+  inputBuscarSismoModal.addEventListener("input", renderTablaSismosModal);
+}
+
+if (tablaSismosModal) {
+  tablaSismosModal.addEventListener("click", (event) => {
+    const row = event.target.closest("tr[data-index]");
+    if (!row) return;
+
+    const index = Number(row.dataset.index);
+    const sismo = sismosTablaModalActuales[index];
+    if (sismo) cargarSismoEnFormularioMapa(sismo);
+  });
+}
+
+btnLimpiarFormMapa.addEventListener("click", () => {
+  formGenerarMapa.reset();
+  sismoModalSeleccionadoId = null;
+  [mapaLatitudInput, mapaLongitudInput, mapaMagnitudInput].forEach(input => {
+    input.setCustomValidity("");
+    input.classList.remove("input-error");
+  });
+  actualizarPreviewFormularioMapa();
+  renderTablaSismosModal();
+  mapaLatitudInput.focus();
+});
+
+function generarPreviewMapaDesdeBoton() {
+  const formularioCompleto = actualizarEstadoBotonGenerarMapa();
+
+  if (!formularioCompleto || !formGenerarMapa.checkValidity()) {
+    formGenerarMapa.reportValidity();
+    return;
+  }
+
+  if (!webAppMapaConfigurada()) {
+    mostrarPreviewError("Debes configurar la constante MAPA_PREVIEW_WEBAPP_URL en el HTML con la URL de tu Web App de Google Apps Script.");
+    estadoGenerarMapa.textContent = "Configura primero la URL del Web App para poder generar la previsualización.";
+    return;
+  }
+
+  const lat = valorCampoMapa(mapaLatitudInput);
+  const lon = valorCampoMapa(mapaLongitudInput);
+  const mag = valorCampoMapa(mapaMagnitudInput);
+  const previewUrl = construirUrlPreviewMapa(lat, lon, mag);
+
+  mostrarLoadingPreviewMapa();
+  estadoGenerarMapa.textContent = `Generando mapa con latitud ${lat}, longitud ${lon} y magnitud ${mag}...`;
+
+  previewMapaFrame.onload = () => {
+    mostrarPreviewLista();
+    estadoGenerarMapa.textContent = `Mapa generado para latitud ${lat}, longitud ${lon} y magnitud ${mag}.`;
+  };
+
+  previewMapaFrame.onerror = () => {
+    mostrarPreviewError("No se pudo cargar la previsualización del mapa.");
+    estadoGenerarMapa.textContent = "Ocurrió un problema al cargar la previsualización.";
+  };
+
+  previewMapaFrame.src = previewUrl;
+}
+
+btnModalGenerarMapa.addEventListener("click", generarPreviewMapaDesdeBoton);
+
+formGenerarMapa.addEventListener("submit", (event) => {
+  // Evita que Enter o validaciones del formulario disparen la generación automáticamente.
+  event.preventDefault();
+});
+
+dialogGenerarMapa.addEventListener("mousedown", (event) => {
+  if (event.target === dialogGenerarMapa) cerrarDialogGenerarMapa();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && dialogGenerarMapa.classList.contains("active")) {
+    cerrarDialogGenerarMapa();
+  }
+});
+
+actualizarPreviewFormularioMapa();
+
+
+function parseFechaHora(fecha, hora) {
+  if (!fecha) return null;
+
+  const fechaLimpia = String(fecha).trim().replace(/\//g, "-");
+  const partesFecha = fechaLimpia.split("-");
+  const partesHora = String(hora || "00:00:00").trim().split(":");
+
+  let year, month, day;
+
+  if (partesFecha[0] && partesFecha[0].length === 4) {
+    year = Number(partesFecha[0]);
+    month = Number(partesFecha[1]) - 1;
+    day = Number(partesFecha[2]);
+  } else {
+    day = Number(partesFecha[0]);
+    month = Number(partesFecha[1]) - 1;
+    year = Number(partesFecha[2]);
+  }
+
+  const hh = Number(partesHora[0] || 0);
+  const mm = Number(partesHora[1] || 0);
+  const ss = Number(partesHora[2] || 0);
+
+  const fechaParseada = new Date(year, month, day, hh, mm, ss);
+  return isNaN(fechaParseada.getTime()) ? null : fechaParseada;
+}
+
+function normalizarTexto(valor) {
+  return String(valor ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function actualizarListaLugares(data) {
+  const vistos = new Map();
+
+  data.forEach(s => {
+    const lugar = String(s.lugar ?? "").trim();
+    const clave = normalizarTexto(lugar);
+    if (lugar && clave && !vistos.has(clave)) vistos.set(clave, lugar);
+  });
+
+  lugaresDisponibles = Array.from(vistos.values())
+    .sort((a, b) => a.localeCompare(b, "es"));
+}
+
+function ocultarSugerenciasLugar() {
+  if (!sugerenciasLugar) return;
+  sugerenciasLugar.classList.remove("visible");
+  sugerenciasLugar.innerHTML = "";
+  sugerenciasActuales = [];
+}
+
+function mostrarSugerenciasLugar() {
+  if (!sugerenciasLugar || !inputBuscarLugar) return;
+
+  const texto = inputBuscarLugar.value.trim();
+  const busqueda = normalizarTexto(texto);
+
+  if (!busqueda) {
+    ocultarSugerenciasLugar();
+    return;
+  }
+
+  sugerenciasActuales = lugaresDisponibles
+    .filter(lugar => normalizarTexto(lugar).includes(busqueda))
+    .slice(0, 10);
+
+  if (!sugerenciasActuales.length) {
+    sugerenciasLugar.innerHTML = '<div class="suggestion-empty">Sin coincidencias</div>';
+    sugerenciasLugar.classList.add("visible");
+    return;
+  }
+
+  sugerenciasLugar.innerHTML = sugerenciasActuales
+    .map((lugar, index) => `<button type="button" class="suggestion-item" data-index="${index}">${escapeHTML(lugar)}</button>`)
+    .join("");
+
+  sugerenciasLugar.classList.add("visible");
+}
+
+function parseCSVRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        cell += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") i++;
+      row.push(cell.trim());
+      if (row.some(v => v !== "")) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell.trim());
+  if (row.some(v => v !== "")) rows.push(row);
+
+  return rows;
+}
+
+function encontrarColumna(headers, nombresPosibles) {
+  const headersNorm = headers.map(normalizarTexto);
+  const nombresNorm = nombresPosibles.map(normalizarTexto);
+  return headersNorm.findIndex(h => nombresNorm.includes(h));
+}
+
+function parseEntero(valor) {
+  const limpio = String(valor ?? "").replace(/[^0-9-]/g, "");
+  return limpio ? Number(limpio) : NaN;
+}
+
+function parseNumero(valor) {
+  let limpio = String(valor ?? "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/[^0-9,.-]/g, "");
+
+  if (!limpio || limpio === "-" || limpio === "." || limpio === ",") return NaN;
+
+  const lastComma = limpio.lastIndexOf(",");
+  const lastDot = limpio.lastIndexOf(".");
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    // Si el último separador es coma, se asume coma decimal: 1.234,5 -> 1234.5
+    // Si el último separador es punto, se asume coma de miles: 1,234.5 -> 1234.5
+    if (lastComma > lastDot) {
+      limpio = limpio.replace(/\./g, "").replace(",", ".");
+    } else {
+      limpio = limpio.replace(/,/g, "");
+    }
+  } else if (lastComma !== -1) {
+    // Para latitud, longitud, profundidad y magnitud: -22,156 -> -22.156
+    limpio = limpio.replace(/,/g, ".");
+  }
+
+  return Number(limpio);
+}
+
+function parsePercibido(valor) {
+  const v = normalizarTexto(valor);
+  return ["si", "s", "true", "verdadero", "1", "yes"].includes(v) ? "SI" : "NO";
+}
+
+function dividirFechaHora(fechaHora) {
+  const limpio = String(fechaHora ?? "").trim();
+  const partes = limpio.split(/\s+/);
+  return {
+    fecha: partes[0] || "",
+    hora: partes[1] || "00:00:00"
+  };
+}
+
+function compararSismosRecientes(a, b) {
+  const an = Number.isFinite(a.n) ? a.n : null;
+  const bn = Number.isFinite(b.n) ? b.n : null;
+
+  if (an !== null && bn !== null && an !== bn) return bn - an;
+
+  const at = a.timestamp instanceof Date && !isNaN(a.timestamp.getTime()) ? a.timestamp.getTime() : 0;
+  const bt = b.timestamp instanceof Date && !isNaN(b.timestamp.getTime()) ? b.timestamp.getTime() : 0;
+
+  return bt - at;
+}
+
+function parseCSV(text) {
+  const rows = parseCSVRows(text.trim());
+  if (rows.length < 2) return [];
+
+  const headers = rows[0];
+  const idx = {
+    n: encontrarColumna(headers, ["N°", "N", "Numero", "Número", "Nro"]),
+    fechaLocal: encontrarColumna(headers, ["Fecha Local", "Fecha/Hora", "Fecha Hora", "Fecha"]),
+    lugar: encontrarColumna(headers, ["Lugar", "Referencia"]),
+    lat: encontrarColumna(headers, ["Latitud", "Lat"]),
+    lon: encontrarColumna(headers, ["Longitud", "Lon", "Lng"]),
+    prof: encontrarColumna(headers, ["Profundidad", "Prof"]),
+    mag: encontrarColumna(headers, ["Magnitud", "Mag"]),
+    percibido: encontrarColumna(headers, ["Percibido", "Sentido"])
+  };
+
+  const faltantes = Object.entries(idx)
+    .filter(([, value]) => value === -1)
+    .map(([key]) => key);
+
+  if (faltantes.length) {
+    console.error("Faltan columnas requeridas en el CSV:", faltantes, headers);
+    return [];
+  }
+
+  return rows.slice(1).map((c, i) => {
+    const fechaHora = c[idx.fechaLocal];
+    const { fecha, hora } = dividirFechaHora(fechaHora);
+    const timestamp = parseFechaHora(fecha, hora);
+
+    return {
+      idInterno: `${fechaHora}_${c[idx.lat]}_${c[idx.lon]}_${i}`,
+      n: parseEntero(c[idx.n]),
+      fecha,
+      hora,
+      lugar: c[idx.lugar] || "Sin referencia",
+      lat: parseNumero(c[idx.lat]),
+      lon: parseNumero(c[idx.lon]),
+      prof: parseNumero(c[idx.prof]),
+      mag: parseNumero(c[idx.mag]),
+      percibido: parsePercibido(c[idx.percibido]),
+      timestamp
+    };
+  }).filter(s =>
+    Number.isFinite(s.lat) &&
+    Number.isFinite(s.lon) &&
+    Number.isFinite(s.prof) &&
+    Number.isFinite(s.mag) &&
+    s.timestamp
+  );
+}
+
+function getColor(mag) {
+  if (mag >= 4) return "#e11d48";
+  if (mag >= 3.5) return "#eab308";
+  return "#22c55e";
+}
+
+function createLabel(s) {
+  const color = getColor(s.mag);
+  const bounceClass = s.percibido === "SI" ? "bounce-label" : "";
+
+  return L.divIcon({
+    className: "label",
+    html: `
+      <div class="${bounceClass}" style="
+        background: white;
+        border-radius: 12px;
+        border: 2px solid ${color};
+        padding: 4px 8px;
+        text-align: center;
+        font-weight: bold;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.22);
+      ">
+        <div style="color:${color}; font-size:14px;">M${s.mag}</div>
+        <div style="font-size:11px; color:black;">${s.prof} km</div>
+      </div>
+    `,
+    iconSize: [62, 42]
+  });
+}
+
+function createBounceIcon(color) {
+  return L.divIcon({
+    html: `
+      <div style="
+        width:16px;
+        height:16px;
+        border-radius:50%;
+        background:${color};
+        box-shadow:0 0 0 5px rgba(255,255,255,0.22);
+      "></div>
+    `,
+    iconSize: [16,16]
+  });
+}
+
+function separatePoints(data) {
+  const groups = {};
+
+  data.forEach(s => {
+    const key = `${s.lat},${s.lon}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+
+  Object.values(groups).forEach(group => {
+    if (group.length > 1) {
+      const step = (2 * Math.PI) / group.length;
+      group.forEach((s, i) => {
+        s.lat += Math.cos(i * step) * 0.01;
+        s.lon += Math.sin(i * step) * 0.01;
+      });
+    }
+  });
+
+  return data;
+}
+
+function actualizarUltimoSismo(dataCompleta) {
+  if (!dataCompleta.length) return;
+
+  const ordenados = [...dataCompleta].sort(compararSismosRecientes);
+  const u = ordenados[0];
+  ultimoSismoGlobal = u;
+
+  const color = getColor(u.mag);
+
+  document.getElementById("ultimo-mag").innerHTML = `<span style="color:${color}">M${u.mag}</span>`;
+  document.getElementById("ultimo-info").innerText = `${u.lugar} | ${u.fecha} ${u.hora}`;
+}
+
+function filtrarPorTiempo(data) {
+  if (filtroTiempoMin === 0) return data;
+
+  const ahora = new Date();
+  const limite = new Date(ahora.getTime() - (filtroTiempoMin * 60 * 1000));
+
+  return data.filter(s => s.timestamp && s.timestamp >= limite);
+}
+
+function filtrarPorTexto(data) {
+  const busqueda = normalizarTexto(filtroTexto);
+  if (!busqueda) return data;
+  return data.filter(s => normalizarTexto(s.lugar).includes(busqueda));
+}
+
+function obtenerEtiquetaTiempo() {
+  const etiquetas = {
+    0: "todos los registros",
+    60: "última hora",
+    360: "últimas 6 horas",
+    1440: "últimas 24 horas",
+    4320: "últimos 3 días",
+    10080: "últimos 7 días"
+  };
+  return etiquetas[filtroTiempoMin] || `${filtroTiempoMin} minutos`;
+}
+
+function actualizarEstadoFiltros(totalFiltrados, totalMostrados) {
+  if (!estadoFiltros) return;
+
+  const limiteTexto = limiteRegistros === 0 ? "sin límite" : `límite ${limiteRegistros}`;
+  const extras = [];
+
+  if (filtroPercibidos) extras.push("solo percibidos");
+  if (filtroTexto.trim()) extras.push(`búsqueda: ${filtroTexto.trim()}`);
+  if (filtroMagnitud === 1) extras.push("M < 3.5");
+  if (filtroMagnitud === 2) extras.push("M 3.5–3.9");
+  if (filtroMagnitud === 3) extras.push("M ≥ 4.0");
+  if (filtroMagnitud === 4) extras.push("M ≥ 5.0");
+
+  const detalleExtras = extras.length ? ` | ${extras.join(" | ")}` : "";
+  estadoFiltros.innerText = `Mostrando ${totalMostrados} de ${totalFiltrados} filtrados (${obtenerEtiquetaTiempo()}, ${limiteTexto})${detalleExtras}.`;
+}
+
+function aplicarLimiteRegistros(data) {
+  if (!limiteRegistros || limiteRegistros <= 0) return data;
+  return data.slice(0, limiteRegistros);
+}
+
+function loadData() {
+  fetch(CSV_URL)
+    .then(r => r.text())
+    .then(txt => {
+      let dataCompleta = parseCSV(txt);
+
+      dataCompleta = dataCompleta.sort(compararSismosRecientes);
+      catalogoSismosModal = dataCompleta;
+      renderTablaSismosModal();
+      actualizarListaLugares(dataCompleta);
+      mostrarSugerenciasLugar();
+
+      actualizarUltimoSismo(dataCompleta);
+
+      let dataFiltrada = dataCompleta.map(s => ({ ...s }));
+
+      dataFiltrada = filtrarPorTiempo(dataFiltrada);
+      dataFiltrada = filtrarPorTexto(dataFiltrada);
+
+      if (filtroPercibidos) {
+        dataFiltrada = dataFiltrada.filter(s => s.percibido === "SI");
+      }
+
+      dataFiltrada = dataFiltrada.filter(s => {
+        let cumpleMag = true;
+
+        if (filtroMagnitud === 1) cumpleMag = s.mag < 3.5;
+        if (filtroMagnitud === 2) cumpleMag = s.mag >= 3.5 && s.mag < 4;
+        if (filtroMagnitud === 3) cumpleMag = s.mag >= 4;
+        if (filtroMagnitud === 4) cumpleMag = s.mag >= 5;
+
+        return cumpleMag;
+      });
+
+      dataFiltrada.sort(compararSismosRecientes);
+      const totalFiltrados = dataFiltrada.length;
+      let data = aplicarLimiteRegistros(dataFiltrada).map(s => ({ ...s }));
+      data = separatePoints(data);
+
+      layer.clearLayers();
+      tabla.innerHTML = "";
+      ultimoCircleGlobal = null;
+
+      document.getElementById("total").innerText = totalFiltrados;
+      actualizarEstadoFiltros(totalFiltrados, data.length);
+
+      if (dataFiltrada.length > 0) {
+        const mags = dataFiltrada.map(s => s.mag);
+        document.getElementById("max").innerText = Math.max(...mags).toFixed(1);
+        document.getElementById("prom").innerText = (mags.reduce((a,b) => a+b,0) / mags.length).toFixed(2);
+        document.getElementById("perc").innerText = dataFiltrada.filter(s => s.percibido === "SI").length;
+      } else {
+        document.getElementById("max").innerText = "0";
+        document.getElementById("prom").innerText = "0";
+        document.getElementById("perc").innerText = "0";
+      }
+
+      data.forEach((s) => {
+        const color = getColor(s.mag);
+
+        const circle = L.circleMarker([s.lat, s.lon], {
+          radius: 6,
+          color: "#020617",
+          weight: 1.5,
+          fillColor: color,
+          fillOpacity: 0.95
+        }).addTo(layer);
+
+        if (ultimoSismoGlobal && s.idInterno === ultimoSismoGlobal.idInterno && !ultimoCircleGlobal) {
+          ultimoCircleGlobal = circle;
+        }
+
+        if (s.percibido === "SI") {
+          L.marker([s.lat, s.lon], { icon: createBounceIcon(color) }).addTo(layer);
+        }
+
+        let label = null;
+        if (mostrarEtiquetas) {
+          label = L.marker([s.lat, s.lon], { icon: createLabel(s) }).addTo(layer);
+        }
+
+        const popupContent = `
+          <div style="min-width:180px; line-height:1.5;">
+            <b>${s.lugar}</b><br>
+            Fecha: ${s.fecha} ${s.hora}<br>
+            Magnitud: ${s.mag}<br>
+            Profundidad: ${s.prof} km<br>
+            Percibido: ${s.percibido}
+          </div>
+        `;
+
+        circle.bindPopup(popupContent);
+        if (label) label.bindPopup(popupContent);
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${Number.isFinite(s.n) ? s.n : ""}</td>
+          <td>${s.fecha} ${s.hora}</td>
+          <td>${s.lugar}</td>
+          <td>${s.prof} km</td>
+          <td>${s.mag}</td>
+          <td>${s.percibido}</td>
+        `;
+
+        row.onclick = () => {
+          map.flyTo([s.lat, s.lon], 11, { duration: 0.8 });
+          setTimeout(() => circle.openPopup(), 800);
+        };
+
+        tabla.appendChild(row);
+      });
+
+      document.getElementById("loading").style.display = "none";
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("loading").innerText = "Error cargando datos";
+    });
+}
+
+loadData();
+setInterval(loadData, 60000);
+
+document.getElementById("ultimo-card").onclick = () => {
+  if (ultimoSismoGlobal && ultimoCircleGlobal) {
+    map.flyTo([ultimoSismoGlobal.lat, ultimoSismoGlobal.lon], 11, { duration: 0.8 });
+    setTimeout(() => ultimoCircleGlobal.openPopup(), 800);
+    return;
+  }
+
+  if (ultimoSismoGlobal) {
+    map.flyTo([ultimoSismoGlobal.lat, ultimoSismoGlobal.lon], 11, { duration: 0.8 });
+  }
+};
+</script>
+
+</body>
+</html>
